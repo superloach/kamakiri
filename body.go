@@ -13,9 +13,7 @@ type Body struct {
 	Torque          float64 // Current angular force (reset to 0 every step)
 	Orient          float64 // Rotation in radians
 	Inertia         float64 // Moment of inertia
-	InverseInertia  float64 // Inverse value of inertia
 	Mass            float64 // Physics body mass
-	InverseMass     float64 // Inverse value of mass
 	StaticFriction  float64 // Friction when the body has not movement (0 to 1)
 	DynamicFriction float64 // Friction when the body has movement (0 to 1)
 	Restitution     float64 // Restitution coefficient of the body (0 to 1)
@@ -25,6 +23,22 @@ type Body struct {
 	Shape           *Shape  // Physics body shape information (type, radius, vertices, normals)
 }
 
+// Inverse value of inertia
+func (b *Body) InverseInertia() float64 {
+	if b.Inertia == 0.0 {
+		return 0.0
+	}
+	return 1 / b.Inertia
+}
+
+// Inverse value of mass
+func (b *Body) InverseMass() float64 {
+	if b.Mass == 0.0 {
+		return 0.0
+	}
+	return 1 / b.Mass
+}
+
 // Creates a new circle physics body with generic parameters
 func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Body {
 	body := &Body{}
@@ -32,7 +46,7 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("[PHYSAC] new physics body creation failed because there is any available id to use\n")
+		w.Debug("new physics body creation failed because there is any available id to use\n")
 		return nil
 	}
 
@@ -65,7 +79,7 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("[PHYSAC] created polygon physics body id %d\n", body.ID)
+	w.Debug("created polygon physics body id %d\n", body.ID)
 
 	return body
 }
@@ -77,7 +91,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("[PHYSAC] new physics body creation failed because there is any available id to use\n")
+		w.Debug("new physics body creation failed because there is any available id to use\n")
 		return nil
 	}
 
@@ -146,7 +160,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("[PHYSAC] created polygon physics body id %i\n", body.ID)
+	w.Debug("created polygon physics body id %i\n", body.ID)
 
 	return body
 }
@@ -158,7 +172,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("[PHYSAC] new physics body creation failed because there is any available id to use\n")
+		w.Debug("new physics body creation failed because there is any available id to use\n")
 		return nil
 	}
 
@@ -230,7 +244,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("[PHYSAC] created polygon physics body id %i\n", body.ID)
+	w.Debug("created polygon physics body id %i\n", body.ID)
 
 	return body
 }
@@ -250,9 +264,8 @@ func (b *Body) AddTorque(amount float64) {
 }
 
 // Shatters a polygon shape physics body to little physics bodies with explosion force.
-func (b *Body) Shatter(w *World, pos XY, force float64) {
+func (b *Body) Shatter(pos XY, force float64) {
 	if b == nil {
-		w.Debug("[PHYSAC] error when trying to shatter a null reference physics body")
 		return
 	}
 
@@ -394,15 +407,60 @@ func (b *Body) Destroy() {
 
 // Finds a valid index for a new physics body initialization.
 func (w *World) findAvailableBodyIndex() int {
-	panic("stub")
+	if len(w.Bodies) == 0 {
+		return 0
+	}
+
+	for i := 0; ; i++ {
+		seen := false
+
+		for _, body := range w.Bodies {
+			if body.ID == uint(i) {
+				seen = true
+				break
+			}
+		}
+
+		if !seen {
+			return i
+		}
+	}
 }
 
 // Integrates physics forces into velocity.
 func (b *Body) integrateForces() {
-	panic("stub")
+	imass := b.InverseMass()
+	if (b == nil) || (imass == 0.0) || !b.Enabled {
+		return
+	}
+
+	b.Velocity.X += (b.Force.X * imass) * (b.World.DeltaTime / 2.0)
+	b.Velocity.Y += (b.Force.Y * imass) * (b.World.DeltaTime / 2.0)
+
+	if b.UseGravity {
+		b.Velocity.X += b.World.GravityForce.X * (b.World.DeltaTime / 1000 / 2.0)
+		b.Velocity.Y += b.World.GravityForce.Y * (b.World.DeltaTime / 1000 / 2.0)
+	}
+
+	if !b.FreezeOrient {
+		b.AngularVelocity += b.Torque * b.InverseInertia() * (b.World.DeltaTime / 2.0)
+	}
 }
 
 // Integrates physics velocity into position and forces.
 func (b *Body) integrateVelocity() {
-	panic("stub")
+	if b == nil || !b.Enabled {
+		return
+	}
+
+	b.Position.X += b.Velocity.X * b.World.DeltaTime
+	b.Position.Y += b.Velocity.Y * b.World.DeltaTime
+
+	if !b.FreezeOrient {
+		b.Orient += b.AngularVelocity * b.World.DeltaTime
+	}
+
+	mat2Set(&b.Shape.Transform, b.Orient)
+
+	b.integrateForces()
 }

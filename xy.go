@@ -48,7 +48,7 @@ func mathNormalize(vector *XY) {
 
 // Returns the sum of two given vectors.
 func xyAdd(v1, v2 XY) XY {
-	panic("stub")
+	return XY{v1.X + v2.X, v1.Y + v2.Y}
 }
 
 // Returns the subtract of two given vectors.

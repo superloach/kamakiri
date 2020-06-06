@@ -9,11 +9,13 @@ const (
 
 // Check if values are between bias range.
 func biasGreaterThan(a, b float64) bool {
-	panic("stub")
+	return a >= (b*0.95 + a*0.01)
 }
 
+// A debug logger function.
 type Debugfn func(string, ...interface{})
 
+// A basic Debugfn that uses `fmt.Printf`.
 var FmtDebugfn Debugfn = func(f string, as ...interface{}) {
 	fmt.Printf("[PHYSAC] "+f, as...)
 }
