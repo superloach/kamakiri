@@ -1,6 +1,9 @@
 package physac
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type Body struct {
 	World           *World
@@ -21,6 +24,15 @@ type Body struct {
 	IsGrounded      bool    // Physics grounded on other body state
 	FreezeOrient    bool    // Physics rotation constraint
 	Shape           *Shape  // Physics body shape information (type, radius, vertices, normals)
+}
+
+// helper for body debug
+func (b *Body) Debug(f string, as ...interface{}) {
+	if b == nil {
+		return
+	}
+
+	b.World.Debug(fmt.Sprintf("[BODY %d] %s", b.ID, f), as...)
 }
 
 // Inverse value of inertia
@@ -46,7 +58,7 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("new physics body creation failed because there is any available id to use\n")
+		w.Debug("couldn't find a body id")
 		return nil
 	}
 
@@ -65,7 +77,7 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 		Body:      body,
 		Radius:    radius,
 		Transform: mat2Radians(0.0),
-		Vertices:  nil,
+		Vertices:  make([]*Vertex, vertices),
 	}
 	body.Mass = math.Pi * radius * radius * density
 	body.Inertia = body.Mass * radius * radius
@@ -79,7 +91,7 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("created polygon physics body id %d\n", body.ID)
+	body.Debug("created circle(%v %0f %0f %d)", pos, radius, density, vertices)
 
 	return body
 }
@@ -91,7 +103,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("new physics body creation failed because there is any available id to use\n")
+		w.Debug("new physics body creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -160,7 +172,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("created polygon physics body id %i\n", body.ID)
+	body.Debug("created polygon physics body id %i", body.ID)
 
 	return body
 }
@@ -172,7 +184,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("new physics body creation failed because there is any available id to use\n")
+		w.Debug("new physics body creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -244,7 +256,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	w.Debug("created polygon physics body id %i\n", body.ID)
+	body.Debug("created polygon physics body id %i", body.ID)
 
 	return body
 }
@@ -253,6 +265,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 func (b *Body) AddForce(force XY) {
 	if b != nil {
 		b.Force = xyAdd(b.Force, force)
+		b.Debug("applied force %v", force)
 	}
 }
 
@@ -391,18 +404,66 @@ func (b *Body) Shatter(pos XY, force float64) {
 }
 
 // Returns transformed position of a body shape (body position + vertex transformed position).
-func (b *Body) GetShapeVertex(index int) XY {
-	panic("stub")
+func (b *Body) GetShapeVertex(vertex int) XY {
+	position := XY{0.0, 0.0}
+
+	if b == nil {
+		return position
+	}
+
+	switch b.Shape.Type {
+	case ShapeTypeCircle:
+		position.X = b.Position.X + math.Cos(360.0/float64(len(b.Shape.Vertices))*float64(vertex)*(math.Pi/180))*b.Shape.Radius
+		position.Y = b.Position.Y + math.Sin(360.0/float64(len(b.Shape.Vertices))*float64(vertex)*(math.Pi/180))*b.Shape.Radius
+	case ShapeTypePolygon:
+		vertexData := b.Shape.Vertices
+		position = xyAdd(b.Position, mat2MultiplyXY(b.Shape.Transform, vertexData[vertex].Position))
+	default:
+	}
+
+	return position
 }
 
 // Sets physics body shape transform based on radians parameter.
 func (b *Body) SetRotation(radians float64) {
-	panic("stub")
+	if b == nil {
+		return
+	}
+
+	b.Orient = radians
+
+	if b.Shape.Type == ShapeTypePolygon {
+		b.Shape.Transform = mat2Radians(radians)
+	}
 }
 
 // Unitializes and destroy a physics body.
 func (b *Body) Destroy() {
-	panic("stub")
+	if b == nil {
+		return
+	}
+
+	id := b.ID
+	index := -1
+
+	for i := 0; i < len(b.World.Bodies); i++ {
+		if b.World.Bodies[i].ID == id {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		b.World.Debug("Not possible to find body id %i in pointers array", id)
+		return
+	}
+
+	// Free body allocated memory
+	b.World.Bodies[index] = b.World.Bodies[len(b.World.Bodies)-1]
+	b.World.Bodies[len(b.World.Bodies)-1] = nil
+	b.World.Bodies = b.World.Bodies[:len(b.World.Bodies)-1]
+
+	b.World.Debug("destroyed physics body id %i", id)
 }
 
 // Finds a valid index for a new physics body initialization.

@@ -8,7 +8,41 @@ type XY struct {
 
 // Calculates clipping based on a normal and two faces.
 func clip(normal XY, _clip float64, a, b *XY) int {
-	panic("stub")
+	sp := 0
+	out := [2]XY{*a, *b}
+
+	// Retrieve distances from each endpoint to the line
+	distanceA := mathDot(normal, *a) - _clip
+	distanceB := mathDot(normal, *b) - _clip
+
+	// If negative (behind plane)
+	if distanceA <= 0.0 {
+		out[sp] = *a
+		sp++
+	}
+
+	if distanceB <= 0.0 {
+		out[sp] = *b
+		sp++
+	}
+
+	// If the points are on different sides of the plane
+	if (distanceA * distanceB) < 0.0 {
+		// Push intersection point
+		alpha := distanceA / (distanceA - distanceB)
+		out[sp] = *a
+		delta := xySubtract(*b, *a)
+		delta.X *= alpha
+		delta.Y *= alpha
+		out[sp] = xyAdd(out[sp], delta)
+		sp++
+	}
+
+	// Assign the new converted values
+	*a = out[0]
+	*b = out[1]
+
+	return sp
 }
 
 // Returns the barycenter of a triangle given by 3 points.

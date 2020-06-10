@@ -37,7 +37,7 @@ func NewWorld() *World {
 		Debugfn: FmtDebugfn,
 	}
 
-	w.Debug("physics module initialized successfully\n")
+	w.Debug("physics module initialized successfully")
 	w.Accumulator = 0.0
 
 	return w
@@ -205,5 +205,5 @@ func (w *World) Debug(f string, as ...interface{}) {
 		return
 	}
 
-	w.Debugfn(f, as...)
+	w.Debugfn(f+"\n", as...)
 }

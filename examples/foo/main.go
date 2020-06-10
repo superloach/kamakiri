@@ -11,6 +11,6 @@ func main() {
 
 	for i := 0; i < 10; i++ {
 		w.RunStep(w.DeltaTime * 10)
-		w.Debug("%8.4f, %8.4f\n", ball.Position.X, ball.Position.Y)
+		ball.Debug("%0f, %0f", ball.Position.X, ball.Position.Y)
 	}
 }

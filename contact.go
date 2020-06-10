@@ -40,7 +40,7 @@ func newContact(w *World, a, b *Body) *Contact {
 	newID := w.findAvailableContactIndex()
 
 	if newID == -1 {
-		w.Debug("new contact creation failed because there is any available id to use\n")
+		w.Debug("new contact creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -66,7 +66,7 @@ func newContact(w *World, a, b *Body) *Contact {
 // Unitializes and destroys a physics contact.
 func (c *Contact) destroy() {
 	if c == nil {
-		panic("tried to destroy a nil *Contact")
+		panic("tried to destroy a nil contact")
 	}
 
 	id := c.ID
@@ -80,7 +80,7 @@ func (c *Contact) destroy() {
 	}
 
 	if index == -1 {
-		c.World.Debug("Not possible to contact id %i in pointers array\n", id)
+		c.World.Debug("Not possible to contact id %i in pointers array", id)
 		return
 	}
 
@@ -532,5 +532,24 @@ func (c *Contact) integrateImpulses() {
 
 // Corrects physics bodies positions based on contacts collision information.
 func (c *Contact) correctPositions() {
-	panic("stub")
+	bodyA := c.BodyA
+	bodyB := c.BodyB
+
+	if (bodyA == nil) || (bodyB == nil) {
+		return
+	}
+
+	correction := XY{0.0, 0.0}
+	correction.X = (math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) / (bodyA.InverseMass() + bodyB.InverseMass())) * c.Normal.X * c.World.PenetrationCorrection
+	correction.Y = (math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) / (bodyA.InverseMass() + bodyB.InverseMass())) * c.Normal.Y * c.World.PenetrationCorrection
+
+	if bodyA.Enabled {
+		bodyA.Position.X -= correction.X * bodyA.InverseMass()
+		bodyA.Position.Y -= correction.Y * bodyA.InverseMass()
+	}
+
+	if bodyB.Enabled {
+		bodyB.Position.X += correction.X * bodyB.InverseMass()
+		bodyB.Position.Y += correction.Y * bodyB.InverseMass()
+	}
 }
