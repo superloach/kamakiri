@@ -12,8 +12,9 @@ A port of Raylib's [Physac](https://github.com/victorfisac/Physac) in pure Go.
  - Remove getters/setters when possible.
  - Use slices of vertices (`[]Vertex`) instead of `Polygon`s
  - `Debugfn` field on a `World`, with a `Debug` helper method.
- - Move `Init` functions into `New` functions.
+ - Move `Init` functionality into `New` functions.
  - Rename `Manifold` to `Contact`.
+ - Make the `Math*` functions methods on respective types.
 
 ## todo
  - Use `time.Duration` for deltas.
