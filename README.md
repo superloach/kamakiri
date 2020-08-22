@@ -14,7 +14,7 @@ A port of Raylib's [Physac](https://github.com/victorfisac/Physac) in pure Go.
  - `Debugfn` field on a `World`, with a `Debug` helper method.
  - Move `Init` functionality into `New` functions.
  - Rename `Manifold` to `Contact`.
- - Make the `Math*` and `Mat2` functions methods on respective types.
+ - Make the `Math*` and `Mat2*` functions methods on respective types.
 
 ## todo
  - Use `time.Duration` for deltas.
