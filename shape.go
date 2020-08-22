@@ -14,7 +14,7 @@ type Shape struct {
 	Body      *Body     // Shape physics body reference.
 	Radius    float64   // Circle shape radius (used for circle shapes).
 	Transform Mat2      // Vertices transform matrix 2x2.
-	Vertices  []*Vertex // Polygon shape vertices position and normals verts (just used for polygon shapes).
+	Vertices  []Vertex  // Polygon shape vertices position and normals verts (just used for polygon shapes).
 }
 
 // Finds polygon shapes axis least penetration.
@@ -27,24 +27,24 @@ func findAxisLeastPenetration(a, b *Shape) (int, float64) {
 	for i := 0; i < len(vertsA); i++ {
 		// Retrieve a face normal from A shape
 		normal := vertsA[i].Normal
-		transNormal := mat2MultiplyXY(a.Transform, normal)
+		transNormal := a.Transform.MultiplyXY(normal)
 
 		// Transform face normal into B shape's model space
-		buT := mat2Transpose(b.Transform)
-		normal = mat2MultiplyXY(buT, transNormal)
+		buT := b.Transform.Transpose()
+		normal = buT.MultiplyXY(transNormal)
 
 		// Retrieve support point from B shape along -n
 		support := b.getSupport(XY{-normal.X, -normal.Y})
 
 		// Retrieve vertex on face from A shape, transform into B shape's model space
 		vertex := vertsA[i].Position
-		vertex = mat2MultiplyXY(a.Transform, vertex)
-		vertex = xyAdd(vertex, a.Body.Position)
-		vertex = xySubtract(vertex, b.Body.Position)
-		vertex = mat2MultiplyXY(buT, vertex)
+		vertex = a.Transform.MultiplyXY(vertex)
+		vertex = vertex.Subtract(a.Body.Position)
+		vertex = vertex.Subtract(b.Body.Position)
+		vertex = buT.MultiplyXY(vertex)
 
 		// Compute penetration distance in B shape's model space
-		distance := mathDot(normal, xySubtract(support, vertex))
+		distance := normal.Dot(support.Subtract(vertex))
 
 		// Store greatest distance
 		if distance > bestDistance {
@@ -64,7 +64,7 @@ func (s *Shape) getSupport(dir XY) XY {
 
 	for i := 0; i < len(vertices); i++ {
 		vertex := vertices[i].Position
-		projection := mathDot(vertex, dir)
+		projection := vertex.Dot(dir)
 
 		if projection > bestProjection {
 			bestVertex = vertex
@@ -82,15 +82,15 @@ func findIncidentFace(v0, v1 *XY, ref, inc *Shape, index int) {
 	refNorm := refVerts[index].Normal
 
 	// Calculate normal in incident's frame of reference
-	refNorm = mat2MultiplyXY(ref.Transform, refNorm)                // To world space
-	refNorm = mat2MultiplyXY(mat2Transpose(inc.Transform), refNorm) // To incident's model space
+	refNorm = ref.Transform.MultiplyXY(refNorm)             // To world space
+	refNorm = inc.Transform.Transpose().MultiplyXY(refNorm) // To incident's model space
 
 	// Find most anti-normal face on polygon
 	incidentFace := 0
 	minDot := math.MaxFloat64
 
 	for i := 0; i < len(incVerts); i++ {
-		dot := mathDot(refNorm, incVerts[i].Normal)
+		dot := refNorm.Dot(incVerts[i].Normal)
 
 		if dot < minDot {
 			minDot = dot
@@ -99,9 +99,9 @@ func findIncidentFace(v0, v1 *XY, ref, inc *Shape, index int) {
 	}
 
 	// Assign face vertices for incident face
-	*v0 = mat2MultiplyXY(inc.Transform, incVerts[incidentFace].Position)
-	*v0 = xyAdd(*v0, inc.Body.Position)
+	*v0 = inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
+	*v0 = v0.Add(inc.Body.Position)
 	incidentFace = (incidentFace + 1) % len(incVerts)
-	*v1 = mat2MultiplyXY(inc.Transform, incVerts[incidentFace].Position)
-	*v1 = xyAdd(*v1, inc.Body.Position)
+	*v1 = inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
+	*v1 = v1.Add(inc.Body.Position)
 }

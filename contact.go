@@ -40,7 +40,6 @@ func newContact(w *World, a, b *Body) *Contact {
 	newID := w.findAvailableContactIndex()
 
 	if newID == -1 {
-		w.Debug("new contact creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -80,7 +79,6 @@ func (c *Contact) destroy() {
 	}
 
 	if index == -1 {
-		c.World.Debug("Not possible to contact id %i in pointers array", id)
 		return
 	}
 
@@ -128,9 +126,9 @@ func (c *Contact) solveCircleToCircle() {
 	}
 
 	// Calculate translational vector, which is normal
-	normal := xySubtract(bodyB.Position, bodyA.Position)
+	normal := bodyB.Position.Subtract(bodyA.Position)
 
-	distSqr := mathLenSqr(normal)
+	distSqr := normal.LenSqr()
 	radius := bodyA.Shape.Radius + bodyB.Shape.Radius
 
 	// Check if circles are not in contact
@@ -191,7 +189,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 
 	// Transform circle center to polygon transform space
 	center := a.Position
-	center = mat2MultiplyXY(mat2Transpose(b.Shape.Transform), xySubtract(center, b.Position))
+	center = b.Shape.Transform.Transpose().MultiplyXY(center.Subtract(b.Position))
 
 	// Find edge with minimum penetration
 	// It is the same concept as using support points in SolvePolygonToPolygon
@@ -200,7 +198,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	vertexData := b.Shape.Vertices
 
 	for i := 0; i < len(vertexData); i++ {
-		currentSeparation := mathDot(vertexData[i].Normal, xySubtract(center, vertexData[i].Position))
+		currentSeparation := vertexData[i].Normal.Dot(center.Subtract(vertexData[i].Position))
 
 		if currentSeparation > a.Shape.Radius {
 			return
@@ -220,7 +218,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	// Check to see if center is within polygon
 	if separation < Epsilon {
 		c.Count = 1
-		normal := mat2MultiplyXY(b.Shape.Transform, vertexData[faceNormal].Normal)
+		normal := b.Shape.Transform.MultiplyXY(vertexData[faceNormal].Normal)
 		c.Normal = XY{-normal.X, -normal.Y}
 		c.Contacts[0] = XY{c.Normal.X*a.Shape.Radius + a.Position.X, c.Normal.Y*a.Shape.Radius + a.Position.Y}
 		c.Penetration = a.Shape.Radius
@@ -228,44 +226,44 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	}
 
 	// Determine which voronoi region of the edge center of circle lies within
-	dot1 := mathDot(xySubtract(center, v1), xySubtract(v2, v1))
-	dot2 := mathDot(xySubtract(center, v2), xySubtract(v1, v2))
+	dot1 := center.Subtract(v1).Dot(v2.Subtract(v1))
+	dot2 := center.Subtract(v2).Dot(v1.Subtract(v2))
 	c.Penetration = a.Shape.Radius - separation
 
 	if dot1 <= 0.0 { // Closest to v1
-		if distSqr(center, v1) > a.Shape.Radius*a.Shape.Radius {
+		if center.DistSqr(v1) > a.Shape.Radius*a.Shape.Radius {
 			return
 		}
 
 		c.Count = 1
-		normal := xySubtract(v1, center)
-		normal = mat2MultiplyXY(b.Shape.Transform, normal)
-		mathNormalize(&normal)
+		normal := v1.Subtract(center)
+		normal = b.Shape.Transform.MultiplyXY(normal)
+		normal = normal.Normalize()
 		c.Normal = normal
-		v1 = mat2MultiplyXY(b.Shape.Transform, v1)
-		v1 = xyAdd(v1, b.Position)
+		v1 = b.Shape.Transform.MultiplyXY(v1)
+		v1 = v1.Add(b.Position)
 		c.Contacts[0] = v1
 	} else if dot2 <= 0.0 { // Closest to v2
-		if distSqr(center, v2) > a.Shape.Radius*a.Shape.Radius {
+		if center.DistSqr(v2) > a.Shape.Radius*a.Shape.Radius {
 			return
 		}
 
 		c.Count = 1
-		normal := xySubtract(v2, center)
-		v2 = mat2MultiplyXY(b.Shape.Transform, v2)
-		v2 = xyAdd(v2, b.Position)
+		normal := v2.Subtract(center)
+		v2 = b.Shape.Transform.MultiplyXY(v2)
+		v2 = v2.Add(b.Position)
 		c.Contacts[0] = v2
-		normal = mat2MultiplyXY(b.Shape.Transform, normal)
-		mathNormalize(&normal)
+		normal = b.Shape.Transform.MultiplyXY(normal)
+		normal = normal.Normalize()
 		c.Normal = normal
 	} else { // Closest to face
 		normal := vertexData[faceNormal].Normal
 
-		if mathDot(xySubtract(center, v1), normal) > a.Shape.Radius {
+		if center.Subtract(v1).Dot(normal) > a.Shape.Radius {
 			return
 		}
 
-		normal = mat2MultiplyXY(b.Shape.Transform, normal)
+		normal = b.Shape.Transform.MultiplyXY(normal)
 		c.Normal = XY{-normal.X, -normal.Y}
 		c.Contacts[0] = XY{c.Normal.X*a.Shape.Radius + a.Position.X, c.Normal.Y*a.Shape.Radius + a.Position.Y}
 		c.Count = 1
@@ -301,7 +299,7 @@ func (c *Contact) solvePolygonToPolygon() {
 	var incPoly *Shape // Incident
 
 	// Determine which shape contains reference face
-	if biasGreaterThan(penetrationA, penetrationB) {
+	if penetrationA >= penetrationB*0.95+penetrationA*0.01 {
 		refPoly = bodyA
 		incPoly = bodyB
 		referenceIndex = faceA
@@ -323,27 +321,34 @@ func (c *Contact) solvePolygonToPolygon() {
 	v2 := refData[referenceIndex].Position
 
 	// Transform vertices to world space
-	v1 = mat2MultiplyXY(refPoly.Transform, v1)
-	v1 = xyAdd(v1, refPoly.Body.Position)
-	v2 = mat2MultiplyXY(refPoly.Transform, v2)
-	v2 = xyAdd(v2, refPoly.Body.Position)
+	v1 = refPoly.Transform.MultiplyXY(v1)
+	v1 = v1.Add(refPoly.Body.Position)
+	v2 = refPoly.Transform.MultiplyXY(v2)
+	v2 = v2.Add(refPoly.Body.Position)
 
 	// Calculate reference face side normal in world space
-	sidePlaneNormal := xySubtract(v2, v1)
-	mathNormalize(&sidePlaneNormal)
+	sidePlaneNormal := v2.Subtract(v1).Normalize()
 
 	// Orthogonalize
 	refFaceNormal := XY{sidePlaneNormal.Y, -sidePlaneNormal.X}
-	refC := mathDot(refFaceNormal, v1)
-	negSide := mathDot(sidePlaneNormal, v1) * -1
-	posSide := mathDot(sidePlaneNormal, v2)
+	refC := refFaceNormal.Dot(v1)
+	negSide := sidePlaneNormal.Dot(v1) * -1
+	posSide := sidePlaneNormal.Dot(v2)
+
+	clip := 0
 
 	// clip incident face to reference face side planes (due to floating point error, possible to not have required points
-	if (clip(XY{-sidePlaneNormal.X, -sidePlaneNormal.Y}, negSide, &incidentFace[0], &incidentFace[1]) < 2) {
+	incidentFace[0], incidentFace[1], clip = (XY{
+		-sidePlaneNormal.X, -sidePlaneNormal.Y,
+	}).Clip(
+		negSide, incidentFace[0], incidentFace[1],
+	)
+	if clip < 2 {
 		return
 	}
 
-	if clip(sidePlaneNormal, posSide, &incidentFace[0], &incidentFace[1]) < 2 {
+	incidentFace[0], incidentFace[1], clip = sidePlaneNormal.Clip(posSide, incidentFace[0], incidentFace[1])
+	if clip < 2 {
 		return
 	}
 
@@ -356,7 +361,7 @@ func (c *Contact) solvePolygonToPolygon() {
 
 	// Keep points behind reference face
 	currentPoint := 0 // clipped points behind reference face
-	separation := mathDot(refFaceNormal, incidentFace[0]) - refC
+	separation := refFaceNormal.Dot(incidentFace[0]) - refC
 
 	if separation <= 0.0 {
 		c.Contacts[currentPoint] = incidentFace[0]
@@ -366,7 +371,7 @@ func (c *Contact) solvePolygonToPolygon() {
 		c.Penetration = 0.0
 	}
 
-	separation = mathDot(refFaceNormal, incidentFace[1]) - refC
+	separation = refFaceNormal.Dot(incidentFace[1]) - refC
 
 	if separation <= 0.0 {
 		c.Contacts[currentPoint] = incidentFace[1]
@@ -396,11 +401,11 @@ func (c *Contact) initialize() {
 
 	for i := 0; i < int(c.Count); i++ {
 		// Caculate radius from center of mass to contact
-		radiusA := xySubtract(c.Contacts[i], bodyA.Position)
-		radiusB := xySubtract(c.Contacts[i], bodyB.Position)
+		radiusA := c.Contacts[i].Subtract(bodyA.Position)
+		radiusB := c.Contacts[i].Subtract(bodyB.Position)
 
-		crossA := mathCross(bodyA.AngularVelocity, radiusA)
-		crossB := mathCross(bodyB.AngularVelocity, radiusB)
+		crossA := radiusA.Cross(bodyA.AngularVelocity)
+		crossB := radiusB.Cross(bodyB.AngularVelocity)
 
 		radiusV := XY{0.0, 0.0}
 		radiusV.X = bodyB.Velocity.X + crossB.X - bodyA.Velocity.X - crossA.X
@@ -408,10 +413,10 @@ func (c *Contact) initialize() {
 
 		// Determine if we should perform a resting collision or not;
 		// The idea is if the only thing moving this object is gravity, then the collision should be performed without any restitution
-		if mathLenSqr(radiusV) < mathLenSqr(XY{
+		if radiusV.LenSqr() < (XY{
 			c.World.GravityForce.X * c.World.DeltaTime / 1000,
 			c.World.GravityForce.Y * c.World.DeltaTime / 1000,
-		})+Epsilon {
+		}).LenSqr()+Epsilon {
 			c.Restitution = 0
 		}
 	}
@@ -435,24 +440,24 @@ func (c *Contact) integrateImpulses() {
 
 	for i := 0; i < int(c.Count); i++ {
 		// Calculate radius from center of mass to contact
-		radiusA := xySubtract(c.Contacts[i], bodyA.Position)
-		radiusB := xySubtract(c.Contacts[i], bodyB.Position)
+		radiusA := c.Contacts[i].Subtract(bodyA.Position)
+		radiusB := c.Contacts[i].Subtract(bodyB.Position)
 
 		// Calculate relative velocity
 		radiusV := XY{0.0, 0.0}
-		radiusV.X = bodyB.Velocity.X + mathCross(bodyB.AngularVelocity, radiusB).X - bodyA.Velocity.X - mathCross(bodyA.AngularVelocity, radiusA).X
-		radiusV.Y = bodyB.Velocity.Y + mathCross(bodyB.AngularVelocity, radiusB).Y - bodyA.Velocity.Y - mathCross(bodyA.AngularVelocity, radiusA).Y
+		radiusV.X = bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X - bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X
+		radiusV.Y = bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y - bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y
 
 		// Relative velocity along the normal
-		contactVelocity := mathDot(radiusV, c.Normal)
+		contactVelocity := radiusV.Dot(c.Normal)
 
 		// Do not resolve if velocities are separating
 		if contactVelocity > 0.0 {
 			return
 		}
 
-		raCrossN := mathCrossXY(radiusA, c.Normal)
-		rbCrossN := mathCrossXY(radiusB, c.Normal)
+		raCrossN := radiusA.CrossXY(c.Normal)
+		rbCrossN := radiusB.CrossXY(c.Normal)
 
 		inverseMassSum := bodyA.InverseMass() + bodyB.InverseMass() + (raCrossN*raCrossN)*bodyA.InverseInertia() + (rbCrossN*rbCrossN)*bodyB.InverseInertia()
 
@@ -469,7 +474,7 @@ func (c *Contact) integrateImpulses() {
 			bodyA.Velocity.Y += bodyA.InverseMass() * (-impulseV.Y)
 
 			if !bodyA.FreezeOrient {
-				bodyA.AngularVelocity += bodyA.InverseInertia() * mathCrossXY(radiusA, XY{-impulseV.X, -impulseV.Y})
+				bodyA.AngularVelocity += bodyA.InverseInertia() * radiusA.CrossXY(XY{-impulseV.X, -impulseV.Y})
 			}
 		}
 
@@ -478,19 +483,19 @@ func (c *Contact) integrateImpulses() {
 			bodyB.Velocity.Y += bodyB.InverseMass() * (impulseV.Y)
 
 			if !bodyB.FreezeOrient {
-				bodyB.AngularVelocity += bodyB.InverseInertia() * mathCrossXY(radiusB, impulseV)
+				bodyB.AngularVelocity += bodyB.InverseInertia() * radiusB.CrossXY(impulseV)
 			}
 		}
 
 		// Apply friction impulse to each physics body
-		radiusV.X = bodyB.Velocity.X + mathCross(bodyB.AngularVelocity, radiusB).X - bodyA.Velocity.X - mathCross(bodyA.AngularVelocity, radiusA).X
-		radiusV.Y = bodyB.Velocity.Y + mathCross(bodyB.AngularVelocity, radiusB).Y - bodyA.Velocity.Y - mathCross(bodyA.AngularVelocity, radiusA).Y
+		radiusV.X = bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X - bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X
+		radiusV.Y = bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y - bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y
 
-		tangent := XY{radiusV.X - (c.Normal.X * mathDot(radiusV, c.Normal)), radiusV.Y - (c.Normal.Y * mathDot(radiusV, c.Normal))}
-		mathNormalize(&tangent)
+		tangent := XY{radiusV.X - (c.Normal.X * radiusV.Dot(c.Normal)), radiusV.Y - (c.Normal.Y * radiusV.Dot(c.Normal))}
+		tangent = tangent.Normalize()
 
 		// Calculate impulse tangent magnitude
-		impulseTangent := -mathDot(radiusV, tangent)
+		impulseTangent := -radiusV.Dot(tangent)
 		impulseTangent /= inverseMassSum
 		impulseTangent /= float64(c.Count)
 
@@ -515,7 +520,7 @@ func (c *Contact) integrateImpulses() {
 			bodyA.Velocity.Y += bodyA.InverseMass() * (-tangentImpulse.Y)
 
 			if !bodyA.FreezeOrient {
-				bodyA.AngularVelocity += bodyA.InverseInertia() * mathCrossXY(radiusA, XY{-tangentImpulse.X, -tangentImpulse.Y})
+				bodyA.AngularVelocity += bodyA.InverseInertia() * radiusA.CrossXY(XY{-tangentImpulse.X, -tangentImpulse.Y})
 			}
 		}
 
@@ -524,7 +529,7 @@ func (c *Contact) integrateImpulses() {
 			bodyB.Velocity.Y += bodyB.InverseMass() * (tangentImpulse.Y)
 
 			if !bodyB.FreezeOrient {
-				bodyB.AngularVelocity += bodyB.InverseInertia() * mathCrossXY(radiusB, tangentImpulse)
+				bodyB.AngularVelocity += bodyB.InverseInertia() * radiusB.CrossXY(tangentImpulse)
 			}
 		}
 	}

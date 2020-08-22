@@ -1,5 +1,11 @@
 package physac
 
+import "math"
+
+const Epsilon float64 = 0.000001
+const K float64 = 1.0 / 3
+const Deg2Rad = math.Pi / 180.0
+
 // Abstraction of globals from original Physac lib.
 type World struct {
 	CollisionIterations   int
@@ -14,8 +20,6 @@ type World struct {
 	GravityForce XY
 	Bodies       []*Body
 	Contacts     []*Contact
-
-	Debugfn Debugfn
 }
 
 // Create a new World abstraction with default params.
@@ -30,15 +34,10 @@ func NewWorld() *World {
 
 		Accumulator:  0.0,
 		StepsCount:   0,
-		GravityForce: XY{0.0, 9.81},
+		GravityForce: XY{0.0, -9.81},
 		Bodies:       make([]*Body, 0),
 		Contacts:     make([]*Contact, 0),
-
-		Debugfn: FmtDebugfn,
 	}
-
-	w.Debug("physics module initialized successfully")
-	w.Accumulator = 0.0
 
 	return w
 }
@@ -54,46 +53,6 @@ func (w *World) RunStep(delta float64) {
 		w.physicsStep()
 		w.Accumulator -= w.DeltaTime
 	}
-}
-
-// Sets physics fixed time step in milliseconds. 1.666666 by default.
-func (w *World) SetTimeStep(delta float64) {
-	panic("stub")
-}
-
-// Returns the current amount of created physics bodies.
-func (w *World) GetBodiesCount() int {
-	panic("stub")
-}
-
-// Returns a physics body of the bodies pool at a specific index.
-func (w *World) GetBody(index int) *Body {
-	panic("stub")
-}
-
-// Returns the physics body shape type (PHYSICS_CIRCLE or PHYSICS_POLYGON).
-func (w *World) GetShapeType(index int) ShapeType {
-	panic("stub")
-}
-
-// Returns the amount of vertices of a physics body shape.
-func (w *World) GetShapeVerticesCount(index int) int {
-	panic("stub")
-}
-
-// Unitializes physics pointers and closes physics loop thread.
-func (w *World) Close() {
-	panic("stub")
-}
-
-// Get hi-res MONOTONIC time measure in mseconds.
-func (w *World) getTimeCount() uint64 {
-	panic("stub")
-}
-
-// Get current time measure in milliseconds.
-func (w *World) getCurrentTime() float64 {
-	panic("stub")
 }
 
 // Physics steps calculations (dynamics, collisions and position corrections).
@@ -197,13 +156,4 @@ func (w *World) physicsStep() {
 			body.Torque = 0.0
 		}
 	}
-}
-
-// Helper function for calling Debugfn. Defaults to doing nothing if w or w.Debugfn are nil.
-func (w *World) Debug(f string, as ...interface{}) {
-	if w == nil || w.Debugfn == nil {
-		return
-	}
-
-	w.Debugfn(f+"\n", as...)
 }

@@ -10,13 +10,12 @@ A port of Raylib's [Physac](https://github.com/victorfisac/Physac) in pure Go.
  - Changed `Create` to `New` per Go conventions.
  - Don't automatically spawn a thread/goroutine - use `RunStep`.
  - Remove getters/setters when possible.
- - Use slices of vertices (`[]*Vertex`) instead of `Polygon`s
+ - Use slices of vertices (`[]Vertex`) instead of `Polygon`s
  - `Debugfn` field on a `World`, with a `Debug` helper method.
  - Move `Init` functions into `New` functions.
  - Rename `Manifold` to `Contact`.
 
 ## todo
- - **Finish [stubs](https://github.com/superloach/physac-go/search?q=stub).** (24 left)
  - Use `time.Duration` for deltas.
  - Make some examples using [Ebiten](https://github.com/hajimehoshi/ebiten).
  - Return `error`s where needed.

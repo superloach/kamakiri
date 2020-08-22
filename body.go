@@ -1,9 +1,6 @@
 package physac
 
-import (
-	"fmt"
-	"math"
-)
+import "math"
 
 type Body struct {
 	World           *World
@@ -24,15 +21,6 @@ type Body struct {
 	IsGrounded      bool    // Physics grounded on other body state
 	FreezeOrient    bool    // Physics rotation constraint
 	Shape           *Shape  // Physics body shape information (type, radius, vertices, normals)
-}
-
-// helper for body debug
-func (b *Body) Debug(f string, as ...interface{}) {
-	if b == nil {
-		return
-	}
-
-	b.World.Debug(fmt.Sprintf("[BODY %d] %s", b.ID, f), as...)
 }
 
 // Inverse value of inertia
@@ -58,7 +46,6 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("couldn't find a body id")
 		return nil
 	}
 
@@ -76,8 +63,8 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 		Type:      ShapeTypeCircle,
 		Body:      body,
 		Radius:    radius,
-		Transform: mat2Radians(0.0),
-		Vertices:  make([]*Vertex, vertices),
+		Transform: Mat2{},
+		Vertices:  make([]Vertex, vertices),
 	}
 	body.Mass = math.Pi * radius * radius * density
 	body.Inertia = body.Mass * radius * radius
@@ -91,8 +78,6 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	body.Debug("created circle(%v %0f %0f %d)", pos, radius, density, vertices)
-
 	return body
 }
 
@@ -103,7 +88,6 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("new physics body creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -121,7 +105,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 		Type:      ShapeTypePolygon,
 		Body:      body,
 		Radius:    0.0,
-		Transform: mat2Radians(0.0),
+		Transform: Mat2{},
 		Vertices:  newRectangleVertices(pos, XY{width, height}),
 	}
 
@@ -137,7 +121,7 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 		next := (i + 1) % len(body.Shape.Vertices)
 		p2 := body.Shape.Vertices[next].Position
 
-		D := mathCrossXY(p1, p2)
+		D := p1.CrossXY(p2)
 		triangleArea := D / 2
 
 		area += triangleArea
@@ -172,8 +156,6 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	body.Debug("created polygon physics body id %i", body.ID)
-
 	return body
 }
 
@@ -184,7 +166,6 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	id := w.findAvailableBodyIndex()
 
 	if id == -1 {
-		w.Debug("new physics body creation failed because there is any available id to use")
 		return nil
 	}
 
@@ -202,7 +183,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 		Type:      ShapeTypePolygon,
 		Body:      body,
 		Radius:    0.0,
-		Transform: mat2Radians(0.0),
+		Transform: Mat2{},
 		Vertices:  newRandomVertices(radius, sides),
 	}
 
@@ -221,7 +202,7 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 		}
 		p2 := body.Shape.Vertices[next].Position
 
-		D := mathCrossXY(p1, p2)
+		D := p1.CrossXY(p2)
 		triangleArea := D / 2
 
 		area += triangleArea
@@ -256,16 +237,13 @@ func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
 
-	body.Debug("created polygon physics body id %i", body.ID)
-
 	return body
 }
 
 // Adds a force to a physics body
 func (b *Body) AddForce(force XY) {
 	if b != nil {
-		b.Force = xyAdd(b.Force, force)
-		b.Debug("applied force %v", force)
+		b.Force = b.Force.Add(force)
 	}
 }
 
@@ -288,13 +266,13 @@ func (b *Body) Shatter(pos XY, force float64) {
 
 		for i := 0; i < len(vertices); i++ {
 			posA := b.Position
-			posB := mat2MultiplyXY(b.Shape.Transform, xyAdd(b.Position, vertices[i].Position))
+			posB := b.Shape.Transform.MultiplyXY(b.Position.Add(vertices[i].Position))
 
 			next := i + 1
 			if next <= len(vertices) {
 				next = 0
 			}
-			posC := mat2MultiplyXY(b.Shape.Transform, xyAdd(b.Position, vertices[next].Position))
+			posC := b.Shape.Transform.MultiplyXY(b.Position.Add(vertices[next].Position))
 
 			// Check collision between each triangle.
 			alpha := ((posB.Y-posC.Y)*(pos.X-posC.X) + (posC.X-posB.X)*(pos.Y-posC.Y)) / ((posB.Y-posC.Y)*(posA.X-posC.X) + (posC.X-posB.X)*(posA.Y-posC.Y))
@@ -322,16 +300,16 @@ func (b *Body) Shatter(pos XY, force float64) {
 
 			for i := 0; i < count; i++ {
 				next := (i + 1) % count
-				center := triangleBarycenter(vertices[i].Position, vertices[next].Position, XY{0, 0})
-				center = xyAdd(bPos, center)
-				offset := xySubtract(center, bPos)
+				center := TriangleBarycenter(vertices[i].Position, vertices[next].Position, XY{0, 0})
+				center = bPos.Add(center)
+				offset := center.Subtract(bPos)
 
 				newBody := NewBodyPolygon(b.World, center, 10, 3, 10)
 
-				newPoly := []*Vertex{
-					{xySubtract(vertices[i].Position, offset), XY{0, 0}},
-					{xySubtract(vertices[next].Position, offset), XY{0, 0}},
-					{xySubtract(pos, center), XY{0, 0}},
+				newPoly := []Vertex{
+					{vertices[i].Position.Subtract(offset), XY{0, 0}},
+					{vertices[next].Position.Subtract(offset), XY{0, 0}},
+					{pos.Subtract(center), XY{0, 0}},
 				}
 
 				// Separate vertices to avoid unnecessary physics collisions
@@ -345,10 +323,10 @@ func (b *Body) Shatter(pos XY, force float64) {
 				// Calculate polygon faces normals
 				for j := 0; j < len(newPoly); j++ {
 					next := (j + 1) % len(newPoly)
-					face := xySubtract(newPoly[next].Position, newPoly[j].Position)
+					face := newPoly[next].Position.Subtract(newPoly[j].Position)
 
 					newPoly[j].Normal = XY{face.Y, -face.X}
-					mathNormalize(&newPoly[j].Normal)
+					newPoly[j].Normal = newPoly[j].Normal.Normalize()
 				}
 
 				// Apply computed vertex data to new physics body shape
@@ -366,7 +344,7 @@ func (b *Body) Shatter(pos XY, force float64) {
 					next := (j + 1) % len(newBody.Shape.Vertices)
 					p2 := newBody.Shape.Vertices[next].Position
 
-					D := mathCrossXY(p1, p2)
+					D := p1.CrossXY(p2)
 					triangleArea := D / 2
 
 					area += triangleArea
@@ -388,11 +366,11 @@ func (b *Body) Shatter(pos XY, force float64) {
 
 				// Calculate explosion force direction
 				pointA := newBody.Position
-				pointB := xySubtract(newPoly[1].Position, newPoly[0].Position)
+				pointB := newPoly[1].Position.Subtract(newPoly[0].Position)
 				pointB.X /= 2.0
 				pointB.Y /= 2.0
-				forceDirection := xySubtract(xyAdd(pointA, xyAdd(newPoly[0].Position, pointB)), newBody.Position)
-				mathNormalize(&forceDirection)
+				forceDirection := pointA.Add(newPoly[0].Position.Add(pointB)).Subtract(newBody.Position)
+				forceDirection = forceDirection.Normalize()
 				forceDirection.X *= force
 				forceDirection.Y *= force
 
@@ -413,11 +391,11 @@ func (b *Body) GetShapeVertex(vertex int) XY {
 
 	switch b.Shape.Type {
 	case ShapeTypeCircle:
-		position.X = b.Position.X + math.Cos(360.0/float64(len(b.Shape.Vertices))*float64(vertex)*(math.Pi/180))*b.Shape.Radius
-		position.Y = b.Position.Y + math.Sin(360.0/float64(len(b.Shape.Vertices))*float64(vertex)*(math.Pi/180))*b.Shape.Radius
+		position.X = b.Position.X + math.Cos(360.0/float64(len(b.Shape.Vertices)*vertex)*Deg2Rad)*b.Shape.Radius
+		position.Y = b.Position.Y + math.Sin(360.0/float64(len(b.Shape.Vertices)*vertex)*Deg2Rad)*b.Shape.Radius
 	case ShapeTypePolygon:
 		vertexData := b.Shape.Vertices
-		position = xyAdd(b.Position, mat2MultiplyXY(b.Shape.Transform, vertexData[vertex].Position))
+		position = b.Position.Add(b.Shape.Transform.MultiplyXY(vertexData[vertex].Position))
 	default:
 	}
 
@@ -433,7 +411,7 @@ func (b *Body) SetRotation(radians float64) {
 	b.Orient = radians
 
 	if b.Shape.Type == ShapeTypePolygon {
-		b.Shape.Transform = mat2Radians(radians)
+		b.Shape.Transform = Mat2Radians(radians)
 	}
 }
 
@@ -454,7 +432,6 @@ func (b *Body) Destroy() {
 	}
 
 	if index == -1 {
-		b.World.Debug("Not possible to find body id %i in pointers array", id)
 		return
 	}
 
@@ -462,8 +439,6 @@ func (b *Body) Destroy() {
 	b.World.Bodies[index] = b.World.Bodies[len(b.World.Bodies)-1]
 	b.World.Bodies[len(b.World.Bodies)-1] = nil
 	b.World.Bodies = b.World.Bodies[:len(b.World.Bodies)-1]
-
-	b.World.Debug("destroyed physics body id %i", id)
 }
 
 // Finds a valid index for a new physics body initialization.
@@ -521,7 +496,7 @@ func (b *Body) integrateVelocity() {
 		b.Orient += b.AngularVelocity * b.World.DeltaTime
 	}
 
-	mat2Set(&b.Shape.Transform, b.Orient)
+	b.Shape.Transform = Mat2Radians(b.Orient)
 
 	b.integrateForces()
 }

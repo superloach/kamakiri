@@ -1,16 +1,25 @@
 package main
 
-import "github.com/superloach/physac-go"
+import (
+	"fmt"
+
+	"github.com/superloach/physac-go"
+)
 
 func main() {
 	w := physac.NewWorld()
+	fmt.Printf("made world %v\n", w)
 
 	ball := physac.NewBodyCircle(w, physac.XY{0, 0}, 5, 1, 10)
+	fmt.Printf("made ball %v\n", ball)
 
-	ball.AddForce(physac.XY{2, -2})
+	force := physac.XY{2, 20}
+
+	fmt.Printf("applying force %v\n", force)
+	ball.AddForce(force)
 
 	for i := 0; i < 10; i++ {
+		fmt.Printf("ball at %v\n", ball.Position)
 		w.RunStep(w.DeltaTime * 10)
-		ball.Debug("%0f, %0f", ball.Position.X, ball.Position.Y)
 	}
 }
