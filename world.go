@@ -1,6 +1,9 @@
 package physac
 
-import "math"
+import (
+	"math"
+	"time"
+)
 
 const Epsilon float64 = 0.000001
 const K float64 = 1.0 / 3
@@ -12,10 +15,10 @@ type World struct {
 	PenetrationAllowance  float64
 	PenetrationCorrection float64
 
-	DeltaTime   float64
-	CurrentTime float64
+	DeltaTime   time.Duration
+	CurrentTime time.Duration
+	Accumulator time.Duration
 
-	Accumulator  float64
 	StepsCount   uint
 	GravityForce XY
 	Bodies       []*Body
@@ -29,10 +32,10 @@ func NewWorld() *World {
 		PenetrationAllowance:  0.05,
 		PenetrationCorrection: 0.4,
 
-		CurrentTime: 0.0,
-		DeltaTime:   1.0 / 60.0 / 10.0 * 1000,
+		CurrentTime: 0,
+		DeltaTime:   time.Second / 600,
+		Accumulator: 0,
 
-		Accumulator:  0.0,
 		StepsCount:   0,
 		GravityForce: XY{0.0, -9.81},
 		Bodies:       make([]*Body, 0),
@@ -42,21 +45,24 @@ func NewWorld() *World {
 	return w
 }
 
-// Run physics step, to be used if PHYSICS_NO_THREADS is set in your main loop.
-// Wrapper to ensure PhysicsStep is run with at a fixed time step.
-func (w *World) RunStep(delta float64) {
+func (w *World) Delta() float64 {
+	return float64(w.DeltaTime) / float64(time.Millisecond)
+}
+
+// RunStep is a wrapper to ensure PhysicsStep is run at a fixed time step.
+func (w *World) RunStep(delta time.Duration) {
 	// Store the time elapsed since the last frame began
 	w.Accumulator += delta
 
 	// Fixed time stepping loop
 	for w.Accumulator >= w.DeltaTime {
-		w.physicsStep()
+		w.PhysicsStep()
 		w.Accumulator -= w.DeltaTime
 	}
 }
 
-// Physics steps calculations (dynamics, collisions and position corrections).
-func (w *World) physicsStep() {
+// PhysicsStep performs physics steps calculations (dynamics, collisions and position corrections) for one DeltaTime.
+func (w *World) PhysicsStep() {
 	// Update current steps count
 	w.StepsCount++
 
@@ -84,14 +90,13 @@ func (w *World) physicsStep() {
 					if bodyA.InverseMass() == 0 && bodyB.InverseMass() == 0 {
 						continue
 					}
-					continue
 
-					contact := newContact(w, bodyA, bodyB)
+					contact := w.NewContact(bodyA, bodyB)
 					contact.solve()
 
 					if contact.Count > 0 {
 						// Create a new contact with same information as previously solved contact and add it to the contacts pool last slot
-						contact2 := newContact(w, bodyA, bodyB)
+						contact2 := w.NewContact(bodyA, bodyB)
 						contact2.Penetration = contact.Penetration
 						contact2.Normal = contact.Normal
 						contact2.Contacts[0] = contact.Contacts[0]

@@ -17,44 +17,45 @@ type Contact struct {
 }
 
 // Finds a valid index for a new contact initialization.
-func (w *World) findAvailableContactIndex() int {
+func (w *World) findAvailableContactIndex() uint {
 	if len(w.Contacts) == 0 {
 		return 0
 	}
 
-	for i := 0; ; i++ {
-		for _, contact := range w.Contacts {
-			if contact.ID == uint(i) {
-				continue
-			}
+	for i := uint(0); ; i++ {
+		seen := false
 
+		for _, contact := range w.Contacts {
+			if contact.ID == i {
+				seen = true
+				break
+			}
+		}
+
+		if !seen {
 			return i
 		}
 	}
 }
 
 // Creates a new physics contact to solve collision.
-func newContact(w *World, a, b *Body) *Contact {
-	contact := &Contact{}
-
-	newID := w.findAvailableContactIndex()
-
-	if newID == -1 {
-		return nil
-	}
-
+func (w *World) NewContact(a, b *Body) *Contact {
 	// Initialize new contact with generic values
-	contact.ID = uint(newID)
-	contact.BodyA = a
-	contact.BodyB = b
-	contact.Penetration = 0
-	contact.Normal = XY{0, 0}
-	contact.Contacts[0] = XY{0, 0}
-	contact.Contacts[1] = XY{0, 0}
-	contact.Count = 0
-	contact.Restitution = 0.0
-	contact.DynamicFriction = 0.0
-	contact.StaticFriction = 0.0
+	contact := &Contact{
+		ID:          w.findAvailableContactIndex(),
+		BodyA:       a,
+		BodyB:       b,
+		Penetration: 0,
+		Normal:      XY{0, 0},
+		Contacts: [2]XY{
+			{0, 0},
+			{0, 0},
+		},
+		Count:           0,
+		Restitution:     0.0,
+		DynamicFriction: 0.0,
+		StaticFriction:  0.0,
+	}
 
 	// Add new body to bodies pointers array and update bodies count
 	w.Contacts = append(w.Contacts, contact)
@@ -63,11 +64,7 @@ func newContact(w *World, a, b *Body) *Contact {
 }
 
 // Unitializes and destroys a physics contact.
-func (c *Contact) destroy() {
-	if c == nil {
-		panic("tried to destroy a nil contact")
-	}
-
+func (c *Contact) Destroy() {
 	id := c.ID
 	index := -1
 
@@ -414,8 +411,8 @@ func (c *Contact) initialize() {
 		// Determine if we should perform a resting collision or not;
 		// The idea is if the only thing moving this object is gravity, then the collision should be performed without any restitution
 		if radiusV.LenSqr() < (XY{
-			c.World.GravityForce.X * c.World.DeltaTime / 1000,
-			c.World.GravityForce.Y * c.World.DeltaTime / 1000,
+			c.World.GravityForce.X * c.World.Delta() / 1000,
+			c.World.GravityForce.Y * c.World.Delta() / 1000,
 		}).LenSqr()+Epsilon {
 			c.Restitution = 0
 		}

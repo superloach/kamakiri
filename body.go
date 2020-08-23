@@ -1,6 +1,8 @@
 package physac
 
-import "math"
+import (
+	"math"
+)
 
 type Body struct {
 	World           *World
@@ -23,6 +25,28 @@ type Body struct {
 	Shape           *Shape  // Physics body shape information (type, radius, vertices, normals)
 }
 
+// Finds a valid index for a new physics body initialization.
+func (w *World) findAvailableBodyIndex() uint {
+	if len(w.Bodies) == 0 {
+		return 0
+	}
+
+	for i := uint(0); ; i++ {
+		seen := false
+
+		for _, body := range w.Bodies {
+			if body.ID == i {
+				seen = true
+				break
+			}
+		}
+
+		if !seen {
+			return i
+		}
+	}
+}
+
 // Inverse value of inertia
 func (b *Body) InverseInertia() float64 {
 	if b.Inertia == 0.0 {
@@ -40,25 +64,27 @@ func (b *Body) InverseMass() float64 {
 }
 
 // Creates a new circle physics body with generic parameters
-func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Body {
-	body := &Body{}
-
-	id := w.findAvailableBodyIndex()
-
-	if id == -1 {
-		return nil
-	}
-
+func (w *World) NewBodyCircle(pos XY, radius, density float64, vertices int) *Body {
 	// Initialize new body with generic values
-	body.World = w
-	body.ID = uint(id)
-	body.Enabled = true
-	body.Position = pos
-	body.Velocity = XY{0, 0}
-	body.Force = XY{0, 0}
-	body.AngularVelocity = 0.0
-	body.Torque = 0.0
-	body.Orient = 0.0
+	body := &Body{
+		World:           w,
+		ID:              w.findAvailableBodyIndex(),
+		Enabled:         true,
+		Position:        pos,
+		Velocity:        XY{0, 0},
+		Force:           XY{0, 0},
+		AngularVelocity: 0.0,
+		Torque:          0.0,
+		Orient:          0.0,
+		Mass:            math.Pi * radius * radius * density,
+		StaticFriction:  0.4,
+		DynamicFriction: 0.2,
+		Restitution:     0.0,
+		UseGravity:      true,
+		IsGrounded:      false,
+		FreezeOrient:    false,
+	}
+	body.Inertia = body.Mass * radius * radius
 	body.Shape = &Shape{
 		Type:      ShapeTypeCircle,
 		Body:      body,
@@ -66,14 +92,6 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 		Transform: Mat2{},
 		Vertices:  make([]Vertex, vertices),
 	}
-	body.Mass = math.Pi * radius * radius * density
-	body.Inertia = body.Mass * radius * radius
-	body.StaticFriction = 0.4
-	body.DynamicFriction = 0.2
-	body.Restitution = 0.0
-	body.UseGravity = true
-	body.IsGrounded = false
-	body.FreezeOrient = false
 
 	// Add new body to bodies pointers array and update bodies count
 	w.Bodies = append(w.Bodies, body)
@@ -82,18 +100,12 @@ func NewBodyCircle(w *World, pos XY, radius, density float64, vertices int) *Bod
 }
 
 // Creates a new rectangle physics body with generic parameters
-func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
+func (w *World) NewBodyRectangle(pos XY, width, height, density float64) *Body {
 	body := &Body{}
-
-	id := w.findAvailableBodyIndex()
-
-	if id == -1 {
-		return nil
-	}
 
 	// Initialize new body with generic values
 	body.World = w
-	body.ID = uint(id)
+	body.ID = w.findAvailableBodyIndex()
 	body.Enabled = true
 	body.Position = pos
 	body.Velocity = XY{0, 0}
@@ -160,18 +172,12 @@ func NewBodyRectangle(w *World, pos XY, width, height, density float64) *Body {
 }
 
 // Creates a new polygon physics body with generic parameters
-func NewBodyPolygon(w *World, pos XY, radius float64, sides int, density float64) *Body {
+func (w *World) NewBodyPolygon(pos XY, radius float64, sides int, density float64) *Body {
 	body := &Body{}
-
-	id := w.findAvailableBodyIndex()
-
-	if id == -1 {
-		return nil
-	}
 
 	// Initialize new body with generic values
 	body.World = w
-	body.ID = uint(id)
+	body.ID = w.findAvailableBodyIndex()
 	body.Enabled = true
 	body.Position = pos
 	body.Velocity = XY{0, 0}
@@ -304,7 +310,7 @@ func (b *Body) Shatter(pos XY, force float64) {
 				center = bPos.Add(center)
 				offset := center.Subtract(bPos)
 
-				newBody := NewBodyPolygon(b.World, center, 10, 3, 10)
+				newBody := b.World.NewBodyPolygon(center, 10, 3, 10)
 
 				newPoly := []Vertex{
 					{vertices[i].Position.Subtract(offset), XY{0, 0}},
@@ -441,28 +447,6 @@ func (b *Body) Destroy() {
 	b.World.Bodies = b.World.Bodies[:len(b.World.Bodies)-1]
 }
 
-// Finds a valid index for a new physics body initialization.
-func (w *World) findAvailableBodyIndex() int {
-	if len(w.Bodies) == 0 {
-		return 0
-	}
-
-	for i := 0; ; i++ {
-		seen := false
-
-		for _, body := range w.Bodies {
-			if body.ID == uint(i) {
-				seen = true
-				break
-			}
-		}
-
-		if !seen {
-			return i
-		}
-	}
-}
-
 // Integrates physics forces into velocity.
 func (b *Body) integrateForces() {
 	imass := b.InverseMass()
@@ -470,16 +454,16 @@ func (b *Body) integrateForces() {
 		return
 	}
 
-	b.Velocity.X += (b.Force.X * imass) * (b.World.DeltaTime / 2.0)
-	b.Velocity.Y += (b.Force.Y * imass) * (b.World.DeltaTime / 2.0)
+	b.Velocity.X += (b.Force.X * imass) * (b.World.Delta() / 2)
+	b.Velocity.Y += (b.Force.Y * imass) * (b.World.Delta() / 2)
 
 	if b.UseGravity {
-		b.Velocity.X += b.World.GravityForce.X * (b.World.DeltaTime / 1000 / 2.0)
-		b.Velocity.Y += b.World.GravityForce.Y * (b.World.DeltaTime / 1000 / 2.0)
+		b.Velocity.X += b.World.GravityForce.X * (b.World.Delta() / 1000 / 2)
+		b.Velocity.Y += b.World.GravityForce.Y * (b.World.Delta() / 1000 / 2)
 	}
 
 	if !b.FreezeOrient {
-		b.AngularVelocity += b.Torque * b.InverseInertia() * (b.World.DeltaTime / 2.0)
+		b.AngularVelocity += b.Torque * b.InverseInertia() * (b.World.Delta() / 2)
 	}
 }
 
@@ -489,11 +473,11 @@ func (b *Body) integrateVelocity() {
 		return
 	}
 
-	b.Position.X += b.Velocity.X * b.World.DeltaTime
-	b.Position.Y += b.Velocity.Y * b.World.DeltaTime
+	b.Position.X += b.Velocity.X * b.World.Delta()
+	b.Position.Y += b.Velocity.Y * b.World.Delta()
 
 	if !b.FreezeOrient {
-		b.Orient += b.AngularVelocity * b.World.DeltaTime
+		b.Orient += b.AngularVelocity * b.World.Delta()
 	}
 
 	b.Shape.Transform = Mat2Radians(b.Orient)

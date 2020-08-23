@@ -1,7 +1,7 @@
 # physac-go
 A port of Raylib's [Physac](https://github.com/victorfisac/Physac) in pure Go.
 
-## changes
+## notable changes
  - Excessive use of the words `Physics` or `Data` removed.
  - `Vector2` is now `XY` for simplicity.
  - Global vars/defines have been moved to a struct called `World`.
@@ -14,8 +14,3 @@ A port of Raylib's [Physac](https://github.com/victorfisac/Physac) in pure Go.
  - Move `Init` functionality into `New` functions.
  - Rename `Manifold` to `Contact`.
  - Make the `Math*` and `Mat2*` functions methods on respective types.
-
-## todo
- - Use `time.Duration` for deltas.
- - Make some examples using [Ebiten](https://github.com/hajimehoshi/ebiten).
- - Return `error`s where needed.

@@ -10,7 +10,7 @@ func main() {
 	w := physac.NewWorld()
 	fmt.Printf("made world %v\n", w)
 
-	ball := physac.NewBodyCircle(w, physac.XY{0, 0}, 5, 1, 10)
+	ball := w.NewBodyCircle(physac.XY{0, 0}, 5, 1, 10)
 	fmt.Printf("made ball %v\n", ball)
 
 	force := physac.XY{2, 20}
