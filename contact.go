@@ -2,6 +2,7 @@ package physac
 
 import "math"
 
+// Contact handles a physics collision.
 type Contact struct {
 	World           *World
 	ID              uint    // Reference unique identifier.
@@ -38,7 +39,7 @@ func (w *World) findAvailableContactIndex() uint {
 	}
 }
 
-// Creates a new physics contact to solve collision.
+// NewContact creates a new physics contact to solve collision.
 func (w *World) NewContact(a, b *Body) *Contact {
 	// Initialize new contact with generic values
 	contact := &Contact{
@@ -63,7 +64,7 @@ func (w *World) NewContact(a, b *Body) *Contact {
 	return contact
 }
 
-// Unitializes and destroys a physics contact.
+// Destroy unitializes and destroys a physics contact.
 func (c *Contact) Destroy() {
 	id := c.ID
 	index := -1
@@ -107,7 +108,8 @@ func (c *Contact) solve() {
 	default:
 	}
 
-	// Update physics body grounded state if normal direction is down and grounded state is not set yet in previous contacts
+	// Update physics body grounded state if normal direction is down and grounded state
+	// is not set yet in previous contacts
 	if !c.BodyB.IsGrounded {
 		c.BodyB.IsGrounded = (c.Normal.Y < 0)
 	}
@@ -143,8 +145,14 @@ func (c *Contact) solveCircleToCircle() {
 		c.Contacts[0] = bodyA.Position
 	} else {
 		c.Penetration = radius - distance
-		c.Normal = XY{normal.X / distance, normal.Y / distance} // Faster than using mathNormalize() due to sqrt is already performed
-		c.Contacts[0] = XY{c.Normal.X*bodyA.Shape.Radius + bodyA.Position.X, c.Normal.Y*bodyA.Shape.Radius + bodyA.Position.Y}
+
+		// Faster than using Normalize() due to sqrt is already performed
+		c.Normal = XY{normal.X / distance, normal.Y / distance}
+
+		c.Contacts[0] = XY{
+			c.Normal.X*bodyA.Shape.Radius + bodyA.Position.X,
+			c.Normal.Y*bodyA.Shape.Radius + bodyA.Position.Y,
+		}
 	}
 
 	// Update physics body grounded state if normal direction is down
@@ -195,7 +203,8 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	vertexData := b.Shape.Vertices
 
 	for i := 0; i < len(vertexData); i++ {
-		currentSeparation := vertexData[i].Normal.Dot(center.Subtract(vertexData[i].Position))
+		currentSeparation := vertexData[i].Normal.Dot(
+			center.Subtract(vertexData[i].Position))
 
 		if currentSeparation > a.Shape.Radius {
 			return
@@ -217,8 +226,12 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 		c.Count = 1
 		normal := b.Shape.Transform.MultiplyXY(vertexData[faceNormal].Normal)
 		c.Normal = XY{-normal.X, -normal.Y}
-		c.Contacts[0] = XY{c.Normal.X*a.Shape.Radius + a.Position.X, c.Normal.Y*a.Shape.Radius + a.Position.Y}
+		c.Contacts[0] = XY{
+			c.Normal.X*a.Shape.Radius + a.Position.X,
+			c.Normal.Y*a.Shape.Radius + a.Position.Y,
+		}
 		c.Penetration = a.Shape.Radius
+
 		return
 	}
 
@@ -227,7 +240,8 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	dot2 := center.Subtract(v2).Dot(v1.Subtract(v2))
 	c.Penetration = a.Shape.Radius - separation
 
-	if dot1 <= 0.0 { // Closest to v1
+	switch {
+	case dot1 <= 0.0: // Closest to v1
 		if center.DistSqr(v1) > a.Shape.Radius*a.Shape.Radius {
 			return
 		}
@@ -240,7 +254,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 		v1 = b.Shape.Transform.MultiplyXY(v1)
 		v1 = v1.Add(b.Position)
 		c.Contacts[0] = v1
-	} else if dot2 <= 0.0 { // Closest to v2
+	case dot2 <= 0.0: // Closest to v2
 		if center.DistSqr(v2) > a.Shape.Radius*a.Shape.Radius {
 			return
 		}
@@ -253,7 +267,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 		normal = b.Shape.Transform.MultiplyXY(normal)
 		normal = normal.Normalize()
 		c.Normal = normal
-	} else { // Closest to face
+	default: // Closest to face
 		normal := vertexData[faceNormal].Normal
 
 		if center.Subtract(v1).Dot(normal) > a.Shape.Radius {
@@ -262,7 +276,10 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 
 		normal = b.Shape.Transform.MultiplyXY(normal)
 		c.Normal = XY{-normal.X, -normal.Y}
-		c.Contacts[0] = XY{c.Normal.X*a.Shape.Radius + a.Position.X, c.Normal.Y*a.Shape.Radius + a.Position.Y}
+		c.Contacts[0] = XY{
+			c.Normal.X*a.Shape.Radius + a.Position.X,
+			c.Normal.Y*a.Shape.Radius + a.Position.Y,
+		}
 		c.Count = 1
 	}
 }
@@ -292,24 +309,21 @@ func (c *Contact) solvePolygonToPolygon() {
 	referenceIndex := 0
 	flip := false // Always point from A shape to B shape
 
-	var refPoly *Shape // Reference
-	var incPoly *Shape // Incident
+	// Reference and incident
+	refPoly := bodyB
+	incPoly := bodyA
+	referenceIndex = faceB
+	flip = true
 
 	// Determine which shape contains reference face
 	if penetrationA >= penetrationB*0.95+penetrationA*0.01 {
 		refPoly = bodyA
 		incPoly = bodyB
 		referenceIndex = faceA
-	} else {
-		refPoly = bodyB
-		incPoly = bodyA
-		referenceIndex = faceB
-		flip = true
 	}
 
 	// World space incident face
-	var incidentFace [2]XY
-	findIncidentFace(&incidentFace[0], &incidentFace[1], refPoly, incPoly, referenceIndex)
+	incidentFace := findIncidentFace(refPoly, incPoly, referenceIndex)
 
 	// Setup reference face vertices
 	refData := refPoly.Vertices
@@ -334,17 +348,17 @@ func (c *Contact) solvePolygonToPolygon() {
 
 	clip := 0
 
-	// clip incident face to reference face side planes (due to floating point error, possible to not have required points
-	incidentFace[0], incidentFace[1], clip = (XY{
-		-sidePlaneNormal.X, -sidePlaneNormal.Y,
-	}).Clip(
-		negSide, incidentFace[0], incidentFace[1],
-	)
+	// clip incident face to reference face side planes (due to floating point error,
+	// possible to not have required points
+	incidentFace[0], incidentFace[1], clip = Clip(
+		XY{-sidePlaneNormal.X, -sidePlaneNormal.Y},
+		negSide, incidentFace[0], incidentFace[1])
 	if clip < 2 {
 		return
 	}
 
-	incidentFace[0], incidentFace[1], clip = sidePlaneNormal.Clip(posSide, incidentFace[0], incidentFace[1])
+	incidentFace[0], incidentFace[1], clip = Clip(sidePlaneNormal, posSide,
+		incidentFace[0], incidentFace[1])
 	if clip < 2 {
 		return
 	}
@@ -409,7 +423,8 @@ func (c *Contact) initialize() {
 		radiusV.Y = bodyB.Velocity.Y + crossB.Y - bodyA.Velocity.Y - crossA.Y
 
 		// Determine if we should perform a resting collision or not;
-		// The idea is if the only thing moving this object is gravity, then the collision should be performed without any restitution
+		// The idea is if the only thing moving this object is gravity, then the
+		// collision should be performed without any restitution
 		if radiusV.LenSqr() < (XY{
 			c.World.GravityForce.X * c.World.Delta() / 1000,
 			c.World.GravityForce.Y * c.World.Delta() / 1000,
@@ -424,14 +439,11 @@ func (c *Contact) integrateImpulses() {
 	bodyA := c.BodyA
 	bodyB := c.BodyB
 
-	if (bodyA == nil) || (bodyB == nil) {
-		return
-	}
-
 	// Early out and positional correct if both objects have infinite mass
 	if math.Abs(bodyA.InverseMass()+bodyB.InverseMass()) <= Epsilon {
 		bodyA.Velocity = XY{0, 0}
 		bodyB.Velocity = XY{0, 0}
+
 		return
 	}
 
@@ -441,13 +453,15 @@ func (c *Contact) integrateImpulses() {
 		radiusB := c.Contacts[i].Subtract(bodyB.Position)
 
 		// Calculate relative velocity
-		radiusV := XY{0.0, 0.0}
-		radiusV.X = bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X - bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X
-		radiusV.Y = bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y - bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y
+		radiusV := XY{
+			bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X -
+				bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X,
+			bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y -
+				bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y,
+		}
 
 		// Relative velocity along the normal
 		contactVelocity := radiusV.Dot(c.Normal)
-
 		// Do not resolve if velocities are separating
 		if contactVelocity > 0.0 {
 			return
@@ -456,12 +470,13 @@ func (c *Contact) integrateImpulses() {
 		raCrossN := radiusA.CrossXY(c.Normal)
 		rbCrossN := radiusB.CrossXY(c.Normal)
 
-		inverseMassSum := bodyA.InverseMass() + bodyB.InverseMass() + (raCrossN*raCrossN)*bodyA.InverseInertia() + (rbCrossN*rbCrossN)*bodyB.InverseInertia()
+		inverseMassSum := bodyA.InverseMass() + bodyB.InverseMass() +
+			(raCrossN*raCrossN)*bodyA.InverseInertia() +
+			(rbCrossN*rbCrossN)*bodyB.InverseInertia()
 
 		// Calculate impulse scalar value
-		impulse := -(1.0 + c.Restitution) * contactVelocity
-		impulse /= inverseMassSum
-		impulse /= float64(c.Count)
+		impulse := -(1.0 + c.Restitution) * contactVelocity /
+			inverseMassSum / float64(c.Count)
 
 		// Apply impulse to each physics body
 		impulseV := XY{c.Normal.X * impulse, c.Normal.Y * impulse}
@@ -471,7 +486,8 @@ func (c *Contact) integrateImpulses() {
 			bodyA.Velocity.Y += bodyA.InverseMass() * (-impulseV.Y)
 
 			if !bodyA.FreezeOrient {
-				bodyA.AngularVelocity += bodyA.InverseInertia() * radiusA.CrossXY(XY{-impulseV.X, -impulseV.Y})
+				bodyA.AngularVelocity += bodyA.InverseInertia() *
+					radiusA.CrossXY(XY{-impulseV.X, -impulseV.Y})
 			}
 		}
 
@@ -485,11 +501,17 @@ func (c *Contact) integrateImpulses() {
 		}
 
 		// Apply friction impulse to each physics body
-		radiusV.X = bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X - bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X
-		radiusV.Y = bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y - bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y
+		radiusV = XY{
+			bodyB.Velocity.X + radiusB.Cross(bodyB.AngularVelocity).X -
+				bodyA.Velocity.X - radiusA.Cross(bodyA.AngularVelocity).X,
+			bodyB.Velocity.Y + radiusB.Cross(bodyB.AngularVelocity).Y -
+				bodyA.Velocity.Y - radiusA.Cross(bodyA.AngularVelocity).Y,
+		}
 
-		tangent := XY{radiusV.X - (c.Normal.X * radiusV.Dot(c.Normal)), radiusV.Y - (c.Normal.Y * radiusV.Dot(c.Normal))}
-		tangent = tangent.Normalize()
+		tangent := (XY{
+			radiusV.X - (c.Normal.X * radiusV.Dot(c.Normal)),
+			radiusV.Y - (c.Normal.Y * radiusV.Dot(c.Normal)),
+		}).Normalize()
 
 		// Calculate impulse tangent magnitude
 		impulseTangent := -radiusV.Dot(tangent)
@@ -508,7 +530,10 @@ func (c *Contact) integrateImpulses() {
 		if absImpulseTangent < impulse*c.StaticFriction {
 			tangentImpulse = XY{tangent.X * impulseTangent, tangent.Y * impulseTangent}
 		} else {
-			tangentImpulse = XY{tangent.X * -impulse * c.DynamicFriction, tangent.Y * -impulse * c.DynamicFriction}
+			tangentImpulse = XY{
+				tangent.X * -impulse * c.DynamicFriction,
+				tangent.Y * -impulse * c.DynamicFriction,
+			}
 		}
 
 		// Apply friction impulse
@@ -517,7 +542,8 @@ func (c *Contact) integrateImpulses() {
 			bodyA.Velocity.Y += bodyA.InverseMass() * (-tangentImpulse.Y)
 
 			if !bodyA.FreezeOrient {
-				bodyA.AngularVelocity += bodyA.InverseInertia() * radiusA.CrossXY(XY{-tangentImpulse.X, -tangentImpulse.Y})
+				bodyA.AngularVelocity += bodyA.InverseInertia() *
+					radiusA.CrossXY(XY{-tangentImpulse.X, -tangentImpulse.Y})
 			}
 		}
 
@@ -526,7 +552,8 @@ func (c *Contact) integrateImpulses() {
 			bodyB.Velocity.Y += bodyB.InverseMass() * (tangentImpulse.Y)
 
 			if !bodyB.FreezeOrient {
-				bodyB.AngularVelocity += bodyB.InverseInertia() * radiusB.CrossXY(tangentImpulse)
+				bodyB.AngularVelocity += bodyB.InverseInertia() *
+					radiusB.CrossXY(tangentImpulse)
 			}
 		}
 	}
@@ -541,9 +568,14 @@ func (c *Contact) correctPositions() {
 		return
 	}
 
-	correction := XY{0.0, 0.0}
-	correction.X = (math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) / (bodyA.InverseMass() + bodyB.InverseMass())) * c.Normal.X * c.World.PenetrationCorrection
-	correction.Y = (math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) / (bodyA.InverseMass() + bodyB.InverseMass())) * c.Normal.Y * c.World.PenetrationCorrection
+	correction := XY{
+		(math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) /
+			(bodyA.InverseMass() + bodyB.InverseMass())) *
+			c.Normal.X * c.World.PenetrationCorrection,
+		(math.Max(c.Penetration-c.World.PenetrationAllowance, 0.0) /
+			(bodyA.InverseMass() + bodyB.InverseMass())) *
+			c.Normal.Y * c.World.PenetrationCorrection,
+	}
 
 	if bodyA.Enabled {
 		bodyA.Position.X -= correction.X * bodyA.InverseMass()

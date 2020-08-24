@@ -1,3 +1,4 @@
+// Package physac is a port of Raylib's Physac in pure Go.
 package physac
 
 import (
@@ -5,11 +6,18 @@ import (
 	"time"
 )
 
-const Epsilon float64 = 0.000001
-const K float64 = 1.0 / 3
-const Deg2Rad = math.Pi / 180.0
+const (
+	// Deg2Rad is the ratio of degrees to radians.
+	Deg2Rad = math.Pi / 180.0
 
-// Abstraction of globals from original Physac lib.
+	// Epsilon is used for contacts.
+	Epsilon float64 = 0.000001
+
+	// K is 1/3.
+	K float64 = 1.0 / 3
+)
+
+// World an abstraction of globals from original Physac lib.
 type World struct {
 	CollisionIterations   int
 	PenetrationAllowance  float64
@@ -25,7 +33,7 @@ type World struct {
 	Contacts     []*Contact
 }
 
-// Create a new World abstraction with default params.
+// NewWorld creates a new World abstraction with default params.
 func NewWorld() *World {
 	w := &World{
 		CollisionIterations:   100,
@@ -45,6 +53,7 @@ func NewWorld() *World {
 	return w
 }
 
+// Delta returns the World's delta as a float64 millisecond value.
 func (w *World) Delta() float64 {
 	return float64(w.DeltaTime) / float64(time.Millisecond)
 }
@@ -61,17 +70,14 @@ func (w *World) RunStep(delta time.Duration) {
 	}
 }
 
-// PhysicsStep performs physics steps calculations (dynamics, collisions and position corrections) for one DeltaTime.
+// PhysicsStep performs physics steps calculations (dynamics, collisions
+// and position corrections) for one DeltaTime.
 func (w *World) PhysicsStep() {
 	// Update current steps count
 	w.StepsCount++
 
 	// Clear previous generated collisions information
-	for i := len(w.Contacts) - 1; i >= 0; i-- {
-		if w.Contacts[i] != nil {
-			w.Contacts[i] = nil
-		}
-	}
+	w.Contacts = w.Contacts[:0]
 
 	// Reset physics bodies grounded state
 	for i := 0; i < len(w.Bodies); i++ {
@@ -79,86 +85,68 @@ func (w *World) PhysicsStep() {
 	}
 
 	// Generate new collision information
-	for i := 0; i < len(w.Bodies); i++ {
-		bodyA := w.Bodies[i]
+	for i, bodyA := range w.Bodies {
+		for j := i + 1; j < len(w.Bodies); j++ {
+			bodyB := w.Bodies[j]
 
-		if bodyA != nil {
-			for j := i + 1; j < len(w.Bodies); j++ {
-				bodyB := w.Bodies[j]
+			if bodyA.InverseMass() == 0 && bodyB.InverseMass() == 0 {
+				continue
+			}
 
-				if bodyB != nil {
-					if bodyA.InverseMass() == 0 && bodyB.InverseMass() == 0 {
-						continue
-					}
+			contact := w.NewContact(bodyA, bodyB)
+			contact.solve()
 
-					contact := w.NewContact(bodyA, bodyB)
-					contact.solve()
-
-					if contact.Count > 0 {
-						// Create a new contact with same information as previously solved contact and add it to the contacts pool last slot
-						contact2 := w.NewContact(bodyA, bodyB)
-						contact2.Penetration = contact.Penetration
-						contact2.Normal = contact.Normal
-						contact2.Contacts[0] = contact.Contacts[0]
-						contact2.Contacts[1] = contact.Contacts[1]
-						contact2.Count = contact.Count
-						contact2.Restitution = contact.Restitution
-						contact2.DynamicFriction = contact.DynamicFriction
-						contact2.StaticFriction = contact.StaticFriction
-					}
+			if contact.Count > 0 {
+				// Create a new contact with same information as
+				// previously solved contact and add it to the contacts
+				// pool last slot
+				contact2 := w.NewContact(bodyA, bodyB)
+				contact2.Penetration = contact.Penetration
+				contact2.Normal = contact.Normal
+				contact2.Contacts = [2]XY{
+					contact.Contacts[0],
+					contact.Contacts[1],
 				}
+				contact2.Count = contact.Count
+				contact2.Restitution = contact.Restitution
+				contact2.DynamicFriction = contact.DynamicFriction
+				contact2.StaticFriction = contact.StaticFriction
 			}
 		}
 	}
 
 	// Integrate forces to physics bodies
 	for i := 0; i < len(w.Bodies); i++ {
-		body := w.Bodies[i]
-		if body != nil {
-			body.integrateForces()
-		}
+		w.Bodies[i].integrateForces()
 	}
 
 	// Initialize physics contacts to solve collisions
 	for i := 0; i < len(w.Contacts); i++ {
-		contact := w.Contacts[i]
-		if contact != nil {
-			contact.initialize()
-		}
+		w.Contacts[i].initialize()
 	}
 
 	// Integrate physics collisions impulses to solve collisions
 	for i := 0; i < w.CollisionIterations; i++ {
 		for j := 0; j < len(w.Contacts); j++ {
-			contact := w.Contacts[i]
-			if contact != nil {
-				contact.integrateImpulses()
-			}
+			w.Contacts[i].integrateImpulses()
 		}
 	}
 
 	// Integrate velocity to physics bodies
 	for i := 0; i < len(w.Bodies); i++ {
-		body := w.Bodies[i]
-		if body != nil {
-			body.integrateVelocity()
-		}
+		w.Bodies[i].integrateVelocity()
 	}
 
-	// Correct physics bodies positions based on contacts collision information
+	// Correct physics bodies positions based on contacts collision
+	// information
 	for i := 0; i < len(w.Contacts); i++ {
-		contact := w.Contacts[i]
-		if contact != nil {
-			contact.correctPositions()
-		}
+		w.Contacts[i].correctPositions()
 	}
 
 	// Clear physics bodies forces
 	for i := 0; i < len(w.Bodies); i++ {
 		body := w.Bodies[i]
-		if body != nil {
-			body.Force = XY{0, 0}
-			body.Torque = 0.0
-		}
+		body.Force = XY{0, 0}
+		body.Torque = 0.0
 	}
 }

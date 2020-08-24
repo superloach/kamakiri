@@ -2,13 +2,18 @@ package physac
 
 import "math"
 
+// ShapeType indicates the type of a Shape.
 type ShapeType uint8
 
 const (
+	// ShapeTypeCircle is the ShapeType for circular Shapes.
 	ShapeTypeCircle ShapeType = iota
+
+	// ShapeTypePolygon is the ShapeType for polygon Shapes.
 	ShapeTypePolygon
 )
 
+// Shape is a physics shape.
 type Shape struct {
 	Type      ShapeType // Physics shape type (circle or polygon).
 	Body      *Body     // Shape physics body reference.
@@ -56,7 +61,7 @@ func findAxisLeastPenetration(a, b *Shape) (int, float64) {
 	return bestIndex, bestDistance
 }
 
-// Returns the extreme point along a direction within a polygon
+// getSupport returns the extreme point along a direction within a polygon.
 func (s *Shape) getSupport(dir XY) XY {
 	bestProjection := -math.MaxFloat64
 	bestVertex := XY{0, 0}
@@ -76,7 +81,7 @@ func (s *Shape) getSupport(dir XY) XY {
 }
 
 // Finds two polygon shapes incident face.
-func findIncidentFace(v0, v1 *XY, ref, inc *Shape, index int) {
+func findIncidentFace(ref, inc *Shape, index int) [2]XY {
 	refVerts := ref.Vertices
 	incVerts := inc.Vertices
 	refNorm := refVerts[index].Normal
@@ -99,9 +104,11 @@ func findIncidentFace(v0, v1 *XY, ref, inc *Shape, index int) {
 	}
 
 	// Assign face vertices for incident face
-	*v0 = inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
-	*v0 = v0.Add(inc.Body.Position)
+	v0 := inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
+	v0 = v0.Add(inc.Body.Position)
 	incidentFace = (incidentFace + 1) % len(incVerts)
-	*v1 = inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
-	*v1 = v1.Add(inc.Body.Position)
+	v1 := inc.Transform.MultiplyXY(incVerts[incidentFace].Position)
+	v1 = v1.Add(inc.Body.Position)
+
+	return [2]XY{v0, v1}
 }

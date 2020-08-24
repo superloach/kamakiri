@@ -2,14 +2,14 @@ package physac
 
 import "math"
 
-// XY type
+// XY is a physics point.
 type XY struct {
 	X float64
 	Y float64
 }
 
-// Calculates clipping based on a normal and two faces.
-func (norm XY) Clip(clip float64, a, b XY) (XY, XY, int) {
+// Clip calculates clipping based on a normal and two faces.
+func Clip(norm XY, clip float64, a, b XY) (XY, XY, int) {
 	sp := 0
 	out := [2]XY{a, b}
 
@@ -43,44 +43,41 @@ func (norm XY) Clip(clip float64, a, b XY) (XY, XY, int) {
 	return out[0], out[1], sp
 }
 
-// Returns the barycenter of a triangle given by 3 points.
-func TriangleBarycenter(v1, v2, v3 XY) XY {
+// TriangleBarycenter returns the barycenter of a triangle given by v, v2, and v3.
+func TriangleBarycenter(v, v2, v3 XY) XY {
 	return XY{
-		(v1.X + v2.X + v3.X) / 3,
-		(v1.Y + v2.Y + v3.Y) / 3,
+		(v.X + v2.X + v3.X) / 3,
+		(v.Y + v2.Y + v3.Y) / 3,
 	}
 }
 
-// Returns the cross product of a vector and a value.
-func (v XY) Cross(value float64) XY {
-	return XY{
-		-value * v.Y,
-		value * v.X,
-	}
+// Cross returns the cross product of v and v2.
+func (v XY) Cross(v2 float64) XY {
+	return XY{-v2 * v.Y, v2 * v.X}
 }
 
-// Returns the cross product of two vectors.
-func (v1 XY) CrossXY(v2 XY) float64 {
-	return v1.X*v2.Y - v1.Y*v2.X
+// CrossXY returns the cross product of v and v2.
+func (v XY) CrossXY(v2 XY) float64 {
+	return v.X*v2.Y - v.Y*v2.X
 }
 
-// Returns the len square root of a vector.
+// LenSqr returns the len square root of a v.
 func (v XY) LenSqr() float64 {
 	return v.X*v.X + v.Y*v.Y
 }
 
-// Returns the dot product of two vectors.
-func (v1 XY) Dot(v2 XY) float64 {
-	return v1.X*v2.X + v1.Y*v2.Y
+// Dot returns the dot product of v and v2.
+func (v XY) Dot(v2 XY) float64 {
+	return v.X*v2.X + v.Y*v2.Y
 }
 
-// Returns the square root of distance between two vectors.
-func (v1 XY) DistSqr(v2 XY) float64 {
-	dir := v1.Subtract(v2)
+// DistSqr returns the square root of the distance between v and v2.
+func (v XY) DistSqr(v2 XY) float64 {
+	dir := v.Subtract(v2)
 	return dir.Dot(dir)
 }
 
-// Returns the normalized values of a vector.
+// Normalize returns the normalized values of v.
 func (v XY) Normalize() XY {
 	length := math.Sqrt(v.X*v.X + v.Y*v.Y)
 
@@ -93,12 +90,12 @@ func (v XY) Normalize() XY {
 	return XY{v.X * ilength, v.Y * ilength}
 }
 
-// Returns the sum of two given vectors.
-func (v1 XY) Add(v2 XY) XY {
-	return XY{v1.X + v2.X, v1.Y + v2.Y}
+// Add the sum of v and v2.
+func (v XY) Add(v2 XY) XY {
+	return XY{v.X + v2.X, v.Y + v2.Y}
 }
 
-// Returns the subtract of two given vectors.
-func (v1 XY) Subtract(v2 XY) XY {
-	return XY{v1.X - v2.X, v1.Y - v2.Y}
+// Subtract returns the difference between v and v2.
+func (v XY) Subtract(v2 XY) XY {
+	return XY{v.X - v2.X, v.Y - v2.Y}
 }
