@@ -1,4 +1,4 @@
-package physac
+package kamakiri
 
 import "math"
 
@@ -36,6 +36,7 @@ func (w *World) findAvailableBodyIndex() uint {
 		for _, body := range w.Bodies {
 			if body.ID == i {
 				seen = true
+
 				break
 			}
 		}
@@ -102,12 +103,12 @@ func (w *World) thing(body *Body) (float64, XY, float64) {
 
 		area += triangleArea
 
-		center.X += triangleArea * K * (p1.X + p2.X)
-		center.Y += triangleArea * K * (p1.Y + p2.Y)
+		center.X += triangleArea * k * (p1.X + p2.X)
+		center.Y += triangleArea * k * (p1.Y + p2.Y)
 
 		intX2 := p1.X*p1.X + p2.X*p1.X + p2.X*p2.X
 		intY2 := p1.Y*p1.Y + p2.Y*p1.Y + p2.Y*p2.Y
-		inertia += (0.25 * K * D) * (intX2 + intY2)
+		inertia += (0.25 * k * D) * (intX2 + intY2)
 	}
 
 	return area, center, inertia
@@ -210,12 +211,12 @@ func (w *World) NewBodyPolygon(pos XY, radius float64, sides int, density float6
 
 		area += triangleArea
 
-		center.X += triangleArea * K * (p1.X + p2.X)
-		center.Y += triangleArea * K * (p1.Y + p2.Y)
+		center.X += triangleArea * k * (p1.X + p2.X)
+		center.Y += triangleArea * k * (p1.Y + p2.Y)
 
 		intX2 := p1.X*p1.X + p2.X*p1.X + p2.X*p2.X
 		intY2 := p1.Y*p1.Y + p2.Y*p1.Y + p2.Y*p2.Y
-		inertia += (0.25 * K * D) * (intX2 + intY2)
+		inertia += (0.25 * k * D) * (intX2 + intY2)
 	}
 
 	center.X *= 1.0 / area
@@ -266,6 +267,7 @@ func (b *Body) Destroy() {
 	for i := 0; i < len(b.World.Bodies); i++ {
 		if b.World.Bodies[i].ID == id {
 			index = i
+
 			break
 		}
 	}
@@ -293,9 +295,9 @@ func (b *Body) GetShapeVertex(vertex int) XY {
 	case ShapeTypeCircle:
 		position = XY{
 			b.Position.X + math.Cos(360.0/float64(len(b.Shape.Vertices)*vertex)*
-				Deg2Rad)*b.Shape.Radius,
+				deg2Rad)*b.Shape.Radius,
 			b.Position.Y + math.Sin(360.0/float64(len(b.Shape.Vertices)*vertex)*
-				Deg2Rad)*b.Shape.Radius,
+				deg2Rad)*b.Shape.Radius,
 		}
 	case ShapeTypePolygon:
 		vertexData := b.Shape.Vertices
@@ -356,6 +358,7 @@ func (b *Body) Shatter(pos XY, force float64) {
 
 			if (alpha > 0.0) && (beta > 0.0) && (gamma > 0.0) {
 				collision = true
+
 				break
 			}
 		}

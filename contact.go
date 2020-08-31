@@ -1,4 +1,4 @@
-package physac
+package kamakiri
 
 import "math"
 
@@ -29,6 +29,7 @@ func (w *World) findAvailableContactIndex() uint {
 		for _, contact := range w.Contacts {
 			if contact.ID == i {
 				seen = true
+
 				break
 			}
 		}
@@ -72,6 +73,7 @@ func (c *Contact) Destroy() {
 	for i := 0; i < len(c.World.Contacts); i++ {
 		if c.World.Contacts[i].ID == id {
 			index = i
+
 			break
 		}
 	}
@@ -133,6 +135,7 @@ func (c *Contact) solveCircleToCircle() {
 	// Check if circles are not in contact
 	if distSqr >= radius*radius {
 		c.Count = 0
+
 		return
 	}
 
@@ -222,7 +225,7 @@ func (c *Contact) solveDifferentShapes(a, b *Body) {
 	v2 := vertexData[next].Position
 
 	// Check to see if center is within polygon
-	if separation < Epsilon {
+	if separation < epsilon {
 		c.Count = 1
 		normal := b.Shape.Transform.MultiplyXY(vertexData[faceNormal].Normal)
 		c.Normal = XY{-normal.X, -normal.Y}
@@ -350,15 +353,23 @@ func (c *Contact) solvePolygonToPolygon() {
 
 	// clip incident face to reference face side planes (due to floating point error,
 	// possible to not have required points
-	incidentFace[0], incidentFace[1], clip = Clip(
-		XY{-sidePlaneNormal.X, -sidePlaneNormal.Y},
-		negSide, incidentFace[0], incidentFace[1])
+	incidentFace[0], incidentFace[1], clip = (XY{
+		-sidePlaneNormal.X,
+		-sidePlaneNormal.Y,
+	}).Clip(
+		negSide,
+		incidentFace[0],
+		incidentFace[1],
+	)
 	if clip < 2 {
 		return
 	}
 
-	incidentFace[0], incidentFace[1], clip = Clip(sidePlaneNormal, posSide,
-		incidentFace[0], incidentFace[1])
+	incidentFace[0], incidentFace[1], clip = sidePlaneNormal.Clip(
+		posSide,
+		incidentFace[0],
+		incidentFace[1],
+	)
 	if clip < 2 {
 		return
 	}
@@ -428,7 +439,7 @@ func (c *Contact) initialize() {
 		if radiusV.LenSqr() < (XY{
 			c.World.GravityForce.X * c.World.Delta() / 1000,
 			c.World.GravityForce.Y * c.World.Delta() / 1000,
-		}).LenSqr()+Epsilon {
+		}).LenSqr()+epsilon {
 			c.Restitution = 0
 		}
 	}
@@ -440,7 +451,7 @@ func (c *Contact) integrateImpulses() {
 	bodyB := c.BodyB
 
 	// Early out and positional correct if both objects have infinite mass
-	if math.Abs(bodyA.InverseMass()+bodyB.InverseMass()) <= Epsilon {
+	if math.Abs(bodyA.InverseMass()+bodyB.InverseMass()) <= epsilon {
 		bodyA.Velocity = XY{0, 0}
 		bodyB.Velocity = XY{0, 0}
 
@@ -521,7 +532,7 @@ func (c *Contact) integrateImpulses() {
 		absImpulseTangent := math.Abs(impulseTangent)
 
 		// Don't apply tiny friction impulses
-		if absImpulseTangent <= Epsilon {
+		if absImpulseTangent <= epsilon {
 			return
 		}
 

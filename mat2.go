@@ -1,4 +1,4 @@
-package physac
+package kamakiri
 
 import "math"
 

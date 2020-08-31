@@ -1,4 +1,4 @@
-package physac
+package kamakiri
 
 import "math"
 
@@ -8,14 +8,14 @@ type XY struct {
 	Y float64
 }
 
-// Clip calculates clipping based on a normal and two faces.
-func Clip(norm XY, clip float64, a, b XY) (XY, XY, int) {
+// Clip calculates clipping based on the normal v and two faces.
+func (v XY) Clip(clip float64, a, b XY) (XY, XY, int) {
 	sp := 0
 	out := [2]XY{a, b}
 
 	// Retrieve distances from each endpoint to the line
-	distanceA := norm.Dot(a) - clip
-	distanceB := norm.Dot(b) - clip
+	distanceA := v.Dot(a) - clip
+	distanceB := v.Dot(b) - clip
 
 	// If negative (behind plane)
 	if distanceA <= 0.0 {
@@ -74,6 +74,7 @@ func (v XY) Dot(v2 XY) float64 {
 // DistSqr returns the square root of the distance between v and v2.
 func (v XY) DistSqr(v2 XY) float64 {
 	dir := v.Subtract(v2)
+
 	return dir.Dot(dir)
 }
 

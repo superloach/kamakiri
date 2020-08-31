@@ -1,5 +1,5 @@
-// Package physac is a port of Raylib's Physac in pure Go.
-package physac
+// Package kamakiri is a simple 2D physics engine in pure Go.
+package kamakiri
 
 import (
 	"math"
@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	// Deg2Rad is the ratio of degrees to radians.
-	Deg2Rad = math.Pi / 180.0
+	// deg2Rad is the ratio of degrees to radians.
+	deg2Rad = math.Pi / 180.0
 
 	// Epsilon is used for contacts.
-	Epsilon float64 = 0.000001
+	epsilon float64 = 0.000001
 
-	// K is 1/3.
-	K float64 = 1.0 / 3
+	// k is 1/3.
+	k float64 = 1.0 / 3
 )
 
 // World an abstraction of globals from original Physac lib.
