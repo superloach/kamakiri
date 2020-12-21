@@ -144,8 +144,7 @@ func (w *World) NewBodyRectangle(
 	center.X *= 1.0 / area
 	center.Y *= 1.0 / area
 
-	// Translate vertices to centroid (make the centroid (0, 0) for the
-	// polygon in model space)
+	// Translate vertices to centroid (make the centroid (0, 0) for the polygon in model space)
 	// Note: this is not really necessary
 	for i := 0; i < len(body.Shape.Vertices); i++ {
 		body.Shape.Vertices[i].Position.X -= center.X
@@ -167,8 +166,7 @@ func (w *World) NewBodyRectangle(
 	return body
 }
 
-// NewBodyPolygon creates a new polygon physics body with generic
-// parameters.
+// NewBodyPolygon creates a new polygon physics body with generic parameters.
 func (w *World) NewBodyPolygon(pos XY, radius float64, sides int, density float64) *Body {
 	body := &Body{}
 
@@ -195,15 +193,11 @@ func (w *World) NewBodyPolygon(pos XY, radius float64, sides int, density float6
 	area := 0.0
 	inertia := 0.0
 
-	for i := 0; i < len(body.Shape.Vertices); i++ {
+	for i, vertex := range body.Shape.Vertices {
 		// Triangle vertices, third vertex implied as (0, 0)
-		p1 := body.Shape.Vertices[i].Position
+		p1 := vertex.Position
 
-		next := i + 1
-		if next >= len(body.Shape.Vertices) {
-			next = 0
-		}
-
+		next := (i + 1) % len(body.Shape.Vertices)
 		p2 := body.Shape.Vertices[next].Position
 
 		D := p1.CrossXY(p2)
@@ -222,8 +216,7 @@ func (w *World) NewBodyPolygon(pos XY, radius float64, sides int, density float6
 	center.X *= 1.0 / area
 	center.Y *= 1.0 / area
 
-	// Translate vertices to centroid (make the centroid (0, 0) for the polygon in model
-	// space)
+	// Translate vertices to centroid (make the centroid (0, 0) for the polygon in model space)
 	// Note: this is not really necessary
 	for i := 0; i < len(body.Shape.Vertices); i++ {
 		body.Shape.Vertices[i].Position.X -= center.X
@@ -282,8 +275,7 @@ func (b *Body) Destroy() {
 	b.World.Bodies = b.World.Bodies[:len(b.World.Bodies)-1]
 }
 
-// GetShapeVertex returns transformed position of a body shape (body position + vertex transformed
-// position).
+// GetShapeVertex returns transformed position of a body shape (body position + vertex transformed position).
 func (b *Body) GetShapeVertex(vertex int) XY {
 	position := XY{}
 
@@ -324,11 +316,10 @@ func (b *Body) InverseMass() float64 {
 		return 0.0
 	}
 
-	return 1 / b.Mass
+	return 1.0 / b.Mass
 }
 
-// Shatter shatters a polygon shape physics body to little physics bodies with explosion
-// force.
+// Shatter shatters a polygon shape physics body to little physics bodies with explosion force.
 func (b *Body) Shatter(pos XY, force float64) {
 	if b == nil {
 		return
@@ -459,8 +450,8 @@ func (b *Body) integrateForces() {
 		return
 	}
 
-	b.Velocity.X += (b.Force.X * imass) * (b.World.Delta() / 2)
-	b.Velocity.Y += (b.Force.Y * imass) * (b.World.Delta() / 2)
+	b.Velocity.X += b.Force.X * imass * b.World.Delta() / 2
+	b.Velocity.Y += b.Force.Y * imass * b.World.Delta() / 2
 
 	if b.UseGravity {
 		b.Velocity.X += b.World.GravityForce.X * (b.World.Delta() / 1000 / 2)

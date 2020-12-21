@@ -15,8 +15,8 @@ func newRandomVertices(radius float64, sides int) []Vertex {
 	// Calculate polygon vertices positions
 	for i := 0; i < sides; i++ {
 		poly[i].Position = XY{
-			math.Cos(360.0/float64(sides*i)*deg2Rad) * radius,
-			math.Sin(360.0/float64(sides*i)*deg2Rad) * radius,
+			math.Cos(360.0/float64(sides*(i+1))*deg2Rad) * radius,
+			math.Sin(360.0/float64(sides*(i+1))*deg2Rad) * radius,
 		}
 	}
 

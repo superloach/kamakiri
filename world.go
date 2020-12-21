@@ -80,8 +80,8 @@ func (w *World) PhysicsStep() {
 	w.Contacts = w.Contacts[:0]
 
 	// Reset physics bodies grounded state
-	for i := 0; i < len(w.Bodies); i++ {
-		w.Bodies[i].IsGrounded = false
+	for _, body := range w.Bodies {
+		body.IsGrounded = false
 	}
 
 	// Generate new collision information
@@ -116,8 +116,8 @@ func (w *World) PhysicsStep() {
 	}
 
 	// Integrate forces to physics bodies
-	for i := 0; i < len(w.Bodies); i++ {
-		w.Bodies[i].integrateForces()
+	for _, body := range w.Bodies {
+		body.integrateForces()
 	}
 
 	// Initialize physics contacts to solve collisions
@@ -128,13 +128,13 @@ func (w *World) PhysicsStep() {
 	// Integrate physics collisions impulses to solve collisions
 	for i := 0; i < w.CollisionIterations; i++ {
 		for j := 0; j < len(w.Contacts); j++ {
-			w.Contacts[i].integrateImpulses()
+			w.Contacts[j].integrateImpulses()
 		}
 	}
 
 	// Integrate velocity to physics bodies
-	for i := 0; i < len(w.Bodies); i++ {
-		w.Bodies[i].integrateVelocity()
+	for _, body := range w.Bodies {
+		body.integrateVelocity()
 	}
 
 	// Correct physics bodies positions based on contacts collision
@@ -144,8 +144,7 @@ func (w *World) PhysicsStep() {
 	}
 
 	// Clear physics bodies forces
-	for i := 0; i < len(w.Bodies); i++ {
-		body := w.Bodies[i]
+	for _, body := range w.Bodies {
 		body.Force = XY{0, 0}
 		body.Torque = 0.0
 	}

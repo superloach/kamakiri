@@ -44,6 +44,7 @@ func (w *World) findAvailableContactIndex() uint {
 func (w *World) NewContact(a, b *Body) *Contact {
 	// Initialize new contact with generic values
 	contact := &Contact{
+		World:       w,
 		ID:          w.findAvailableContactIndex(),
 		BodyA:       a,
 		BodyB:       b,
